@@ -1,0 +1,116 @@
+# sssf.config.yaml — SSSF Agent Roster (Managed by SSSF Studio)
+# One agent, one prompt, one purpose.
+defaults:
+  coding_agent: pi
+  model: google/gemini-3.6-flash
+  thinking: medium
+  tools:
+    - read
+    - bash
+    - edit
+    - write
+    - grep
+    - find
+    - ls
+  protected_files:
+    - adws/adw_modules/
+    - adws/adw_sssf_config/
+    - adws/adw_*.py
+  data_dir: adws/adw_data
+observability:
+  db: adws/adw_data/sssf.db
+  poll_ms: 500
+agents:
+  - name: planner
+    model: fireworks/accounts/fireworks/models/kimi-k3
+    thinking: high
+    color: "#a78bfa"
+    purpose: Turn a request into a plan the builder can implement without asking questions.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/planner/system.md
+      user: adws/adw_data/prompt_engineering/planner/user.md
+    harness_engineering:
+      - adws/adw_data/harness_engineering/subagents.ts
+    writes:
+      - specs/
+    tools:
+      - read
+      - grep
+      - find
+      - ls
+      - bash
+      - write
+      - subagent_create
+      - subagent_continue
+      - subagent_list
+      - subagent_remove
+  - name: builder
+    color: "#22d3ee"
+    purpose: Implement the plan exactly; report every changed file in the envelope.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/builder/system.md
+      user: adws/adw_data/prompt_engineering/builder/user.md
+    tools:
+      - read
+      - grep
+      - find
+      - ls
+      - bash
+      - edit
+      - write
+  - name: scout
+    color: "#fbbf24"
+    purpose: Find and report where things live; change nothing.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/scout/system.md
+      user: adws/adw_data/prompt_engineering/scout/user.md
+    harness_engineering:
+      - adws/adw_data/harness_engineering/subagents.ts
+    writes: []
+    tools:
+      - read
+      - grep
+      - find
+      - ls
+      - bash
+      - write
+      - subagent_create
+      - subagent_continue
+      - subagent_list
+      - subagent_remove
+  - name: reviewer
+    model: openai/gpt-5.6-terra
+    thinking: high
+    color: "#fb7185"
+    purpose: Confirm that what was built is what was asked for; change nothing.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/reviewer/system.md
+      user: adws/adw_data/prompt_engineering/reviewer/user.md
+    writes: []
+    tools:
+      - read
+      - grep
+      - find
+      - ls
+      - bash
+      - write
+  - name: documenter
+    model: openai/gpt-5.6-luna
+    color: "#e879f9"
+    purpose: Write up the change that was just made, from the diff; document only.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/documenter/system.md
+      user: adws/adw_data/prompt_engineering/documenter/user.md
+    writes:
+      - app_docs/
+      - docs/
+      - "**/*.md"
+      - "*.md"
+    tools:
+      - read
+      - grep
+      - find
+      - ls
+      - bash
+      - write
+      - edit

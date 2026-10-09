@@ -1,0 +1,86 @@
+{
+  "approvals": [
+    {
+      "id": "appr-muzjk949",
+      "timestamp": "2026-10-08T12:57:33.993Z",
+      "specTitle": "Like to build an app that. Is for yard sales. Like if I see ",
+      "savedFilePath": "C:\\Antigravity Software Factory\\requests\\approved-spec.md",
+      "approvedBy": "Lead Engineer",
+      "wordCount": 462,
+      "summary": "Specification intake for \"Like to build an app that. Is for yard sales. Like if I see something at a yard sale or flea market...\"",
+      "content": "<!-- SSSF APPROVED SPECIFICATION -->\n<!-- Approved At: 2026-10-08T12:57:33.993Z -->\n<!-- Approved By: Lead Engineer -->\n<!-- Session ID: disc-9u33zth -->\n\n# Like to build an app that. Is for yard sales. Like if I see something \n\n## 1. Overview & Business Objectives\nLike to build an app that. Is for yard sales. Like if I see something at a yard sale or flea market I want to buy, I take a picture of it, it runs uh eBay search to see what it actually sold for. I determine whether I want to buy it. If I buy it II hit enter it goes into inventory and then when I sell it on my flea market or yard sale, umm, I put how much I sold it for and it takes it out of inventory. Just a basic journal. Umm income and outcome.\n\n## 2. User Stories & Acceptance Criteria\n- [ ] **Core Functionality**: The requested functionality is implemented according to requirements without regressing existing features.\n- [ ] **Contract Compliance**: Typed JSON interfaces are adhered to; envelopes parse cleanly without schema violations.\n- [ ] **Verification**: Quality verification commands run with exit code 0 and green status.\n- [ ] **Documentation**: Any new interfaces or configuration options are documented clearly.\n\n## 3. Architecture & Technical Breakdown\n- **Runtime Environment**: Cross-platform support (Windows & Unix).\n- **Core Pattern**: Separation of concerns between engineer intent, deterministic code, and agent phases.\n- **Data Flow**: Unidirectional data path, strictly avoiding side effects outside target directory.\n\n## 4. Protected Boundaries\n- Core ADW factory scripts (`adws/adw_*.py`) and modules (`adws/adw_modules/`) remain unchanged.\n- Changes are scoped strictly to the target repository workspace.\n\n## 5. Potential Risks & Mitigations\n- **Scope Creep during Agent Builder Phase** (medium): Anchor builder agent with strict acceptance criteria in this approved specification to prevent unauthorized refactoring.\n- **Excessive Context Window Consumption** (low): Keep specification focused; planner agent uses bounded prompt engineering and subagents for broad searches.\n- **Windows vs Unix Cross-Platform Shell Quirks** (medium): Always use argument lists instead of bare shell strings; specify explicit UTF-8 encoding for Python subprocesses.\n\n## 6. Execution Recommendation\nRecommended ADW: `adw_simple_sdlc.py` or `adw_plan_build_test.py`.\n\n\n### Boundary Constraints\n- All new code must reside strictly in application packages.\n- Core factory code in `adws/adw_modules/` remains untouched.\n\n### Data Transfer Contracts\n- All API communication must use strictly typed JSON interfaces.\n- Explicit error fields (`{ ok: boolean, error?: string }`) for all operations.\n\n### Verification Commands\n- Build verification: `bun run build` or `python -m compileall`\n- Test verification: verify exit code 0 and non-empty stdout.\n\n---\n## Factory Handoff Checklist\n- [x] Human engineer reviewed and approved specification\n- [x] Clear acceptance criteria and boundaries defined\n- [x] Ready for ADW execution (e.g. adw_simple_sdlc.py or adw_plan_build_test.py)\n"
+    },
+    {
+      "id": "appr-muzjatfy",
+      "timestamp": "2026-10-08T12:50:13.773Z",
+      "specTitle": "Like to build an app that. Is for yard sales. Like if I see ",
+      "savedFilePath": "C:\\Antigravity Software Factory\\requests\\approved-spec.md",
+      "approvedBy": "Lead Engineer",
+      "wordCount": 462,
+      "summary": "Specification intake for \"Like to build an app that. Is for yard sales. Like if I see something at a yard sale or flea market...\"",
+      "content": "<!-- SSSF APPROVED SPECIFICATION -->\n<!-- Approved At: 2026-10-08T12:50:13.773Z -->\n<!-- Approved By: Lead Engineer -->\n<!-- Session ID: disc-9u33zth -->\n\n# Like to build an app that. Is for yard sales. Like if I see something \n\n## 1. Overview & Business Objectives\nLike to build an app that. Is for yard sales. Like if I see something at a yard sale or flea market I want to buy, I take a picture of it, it runs uh eBay search to see what it actually sold for. I determine whether I want to buy it. If I buy it II hit enter it goes into inventory and then when I sell it on my flea market or yard sale, umm, I put how much I sold it for and it takes it out of inventory. Just a basic journal. Umm income and outcome.\n\n## 2. User Stories & Acceptance Criteria\n- [ ] **Core Functionality**: The requested functionality is implemented according to requirements without regressing existing features.\n- [ ] **Contract Compliance**: Typed JSON interfaces are adhered to; envelopes parse cleanly without schema violations.\n- [ ] **Verification**: Quality verification commands run with exit code 0 and green status.\n- [ ] **Documentation**: Any new interfaces or configuration options are documented clearly.\n\n## 3. Architecture & Technical Breakdown\n- **Runtime Environment**: Cross-platform support (Windows & Unix).\n- **Core Pattern**: Separation of concerns between engineer intent, deterministic code, and agent phases.\n- **Data Flow**: Unidirectional data path, strictly avoiding side effects outside target directory.\n\n## 4. Protected Boundaries\n- Core ADW factory scripts (`adws/adw_*.py`) and modules (`adws/adw_modules/`) remain unchanged.\n- Changes are scoped strictly to the target repository workspace.\n\n## 5. Potential Risks & Mitigations\n- **Scope Creep during Agent Builder Phase** (medium): Anchor builder agent with strict acceptance criteria in this approved specification to prevent unauthorized refactoring.\n- **Excessive Context Window Consumption** (low): Keep specification focused; planner agent uses bounded prompt engineering and subagents for broad searches.\n- **Windows vs Unix Cross-Platform Shell Quirks** (medium): Always use argument lists instead of bare shell strings; specify explicit UTF-8 encoding for Python subprocesses.\n\n## 6. Execution Recommendation\nRecommended ADW: `adw_simple_sdlc.py` or `adw_plan_build_test.py`.\n\n\n### Boundary Constraints\n- All new code must reside strictly in application packages.\n- Core factory code in `adws/adw_modules/` remains untouched.\n\n### Data Transfer Contracts\n- All API communication must use strictly typed JSON interfaces.\n- Explicit error fields (`{ ok: boolean, error?: string }`) for all operations.\n\n### Verification Commands\n- Build verification: `bun run build` or `python -m compileall`\n- Test verification: verify exit code 0 and non-empty stdout.\n\n---\n## Factory Handoff Checklist\n- [x] Human engineer reviewed and approved specification\n- [x] Clear acceptance criteria and boundaries defined\n- [x] Ready for ADW execution (e.g. adw_simple_sdlc.py or adw_plan_build_test.py)\n"
+    },
+    {
+      "id": "appr-muz9ugph",
+      "timestamp": "2026-10-08T08:25:34.227Z",
+      "specTitle": "Build an in-memory caching layer with TTL expiration and LRU",
+      "savedFilePath": "C:\\Antigravity Software Factory\\requests\\approved-cache-spec.md",
+      "approvedBy": "David Sahms",
+      "wordCount": 337,
+      "summary": "Specification intake for \"Build an in-memory caching layer with TTL expiration and LRU eviction policy....\"",
+      "content": "<!-- SSSF APPROVED SPECIFICATION -->\n<!-- Approved At: 2026-10-08T08:25:34.227Z -->\n<!-- Approved By: David Sahms -->\n<!-- Session ID: disc-2ikp1qd -->\n\n# Build an in-memory caching layer with TTL expiration and LRU eviction \n\n## 1. Overview & Business Objectives\nBuild an in-memory caching layer with TTL expiration and LRU eviction policy.\n\n## 2. User Stories & Acceptance Criteria\n- [ ] **Core Functionality**: The requested functionality is implemented according to requirements without regressing existing features.\n- [ ] **Contract Compliance**: Typed JSON interfaces are adhered to; envelopes parse cleanly without schema violations.\n- [ ] **Verification**: Quality verification commands run with exit code 0 and green status.\n- [ ] **Documentation**: Any new interfaces or configuration options are documented clearly.\n\n## 3. Architecture & Technical Breakdown\n- **Runtime Environment**: Cross-platform support (Windows & Unix).\n- **Core Pattern**: Separation of concerns between engineer intent, deterministic code, and agent phases.\n- **Data Flow**: Unidirectional data path, strictly avoiding side effects outside target directory.\n\n## 4. Protected Boundaries\n- Core ADW factory scripts (`adws/adw_*.py`) and modules (`adws/adw_modules/`) remain unchanged.\n- Changes are scoped strictly to the target repository workspace.\n\n## 5. Potential Risks & Mitigations\n- **Scope Creep during Agent Builder Phase** (medium): Anchor builder agent with strict acceptance criteria in this approved specification to prevent unauthorized refactoring.\n- **Excessive Context Window Consumption** (low): Keep specification focused; planner agent uses bounded prompt engineering and subagents for broad searches.\n- **Windows vs Unix Cross-Platform Shell Quirks** (medium): Always use argument lists instead of bare shell strings; specify explicit UTF-8 encoding for Python subprocesses.\n\n## 6. Execution Recommendation\nRecommended ADW: `adw_simple_sdlc.py` or `adw_plan_build_test.py`.\n\n\n### Boundary Constraints\n- All new code must reside strictly in application packages.\n- Core factory code in `adws/adw_modules/` remains untouched.\n\n- **Resolved Decision [Which environment and runtime should this feature target primarily?]**: Universal Cross-Platform (Windows & Linux)\n\n---\n## Factory Handoff Checklist\n- [x] Human engineer reviewed and approved specification\n- [x] Clear acceptance criteria and boundaries defined\n- [x] Ready for ADW execution (e.g. adw_simple_sdlc.py or adw_plan_build_test.py)\n"
+    }
+  ],
+  "runs": [
+    {
+      "runId": "run-muzjtu67",
+      "adwId": "",
+      "workflowId": "adw_simple_sdlc.py",
+      "status": "fail",
+      "startedAt": "2026-10-08T13:05:01.183Z",
+      "endedAt": "2026-10-08T13:05:01.713Z",
+      "exitCode": 1,
+      "promptPreview": "C:\\Antigravity Software Factory\\requests\\approved-spec.md"
+    },
+    {
+      "runId": "run-muzjmd2s",
+      "adwId": "",
+      "workflowId": "adw_simple_sdlc.py",
+      "status": "fail",
+      "startedAt": "2026-10-08T12:59:12.436Z",
+      "endedAt": "2026-10-08T12:59:12.961Z",
+      "exitCode": 1,
+      "promptPreview": "C:\\Antigravity Software Factory\\requests\\approved-spec.md"
+    },
+    {
+      "runId": "run-muzjkbmh",
+      "adwId": "",
+      "workflowId": "adw_simple_sdlc.py",
+      "status": "fail",
+      "startedAt": "2026-10-08T12:57:37.241Z",
+      "endedAt": "2026-10-08T12:57:37.775Z",
+      "exitCode": 1,
+      "promptPreview": "C:\\Antigravity Software Factory\\requests\\approved-spec.md"
+    },
+    {
+      "runId": "run-muzjj64j",
+      "adwId": "",
+      "workflowId": "adw_simple_sdlc.py",
+      "status": "fail",
+      "startedAt": "2026-10-08T12:56:43.459Z",
+      "endedAt": "2026-10-08T12:56:44.923Z",
+      "exitCode": 1,
+      "promptPreview": "C:\\Antigravity Software Factory\\requests\\approved-spec.md"
+    },
+    {
+      "runId": "run-muzjb47v",
+      "adwId": "",
+      "workflowId": "adw_simple_sdlc.py",
+      "status": "fail",
+      "startedAt": "2026-10-08T12:50:27.739Z",
+      "endedAt": "2026-10-08T12:50:29.238Z",
+      "exitCode": 1,
+      "promptPreview": "C:\\Antigravity Software Factory\\requests\\approved-spec.md"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "sssf-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SSSF Studio – Unified Control Layer for Super Simple Software Factory",
+  "scripts": {
+    "dev": "vite",
+    "server": "bun run server/index.ts",
+    "start": "bun run server/index.ts",
+    "dev:all": "bun run server/index.ts & vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/play": "^5.3.0",
+    "lucide-vue-next": "^1.0.0",
+    "vue": "^3.5.13",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "@vitejs/plugin-vue": "^6",
+    "typescript": "^5.7.2",
+    "vite": "^7",
+    "vue-tsc": "^3"
+  }
+}
