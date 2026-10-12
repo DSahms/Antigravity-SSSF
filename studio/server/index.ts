@@ -10,6 +10,8 @@ import { ProjectManager } from "./project.ts";
 import { DiscoveryEngine } from "./discovery.ts";
 import { ConfigManager } from "./config.ts";
 import { WorkflowLauncher } from "./launcher.ts";
+import { ApprovalBook } from "./approvals.ts";
+import { ProfileStore } from "./profiles.ts";
 import type { AgentPrompts, ApiError, HealthResponse } from "../shared/types.ts";
 
 const PORT = Number(process.env.STUDIO_PORT ?? process.env.PORT ?? 4620);
@@ -27,7 +29,9 @@ console.log(`[studio] Initial target: ${initialTargetDir}`);
 const projectMgr = new ProjectManager(initialTargetDir, FACTORY_ROOT);
 const discovery = new DiscoveryEngine(initialTargetDir);
 const configMgr = new ConfigManager(initialTargetDir);
-const launcher = new WorkflowLauncher(initialTargetDir);
+const approvalBook = new ApprovalBook(initialTargetDir);
+const profiles = new ProfileStore(initialTargetDir);
+const launcher = new WorkflowLauncher(initialTargetDir, approvalBook);
 
 let activeDb: SssfDb | null = null;
 
@@ -65,6 +69,10 @@ function notFound(message: string): Response {
   return json({ error: message } satisfies ApiError, 404);
 }
 
+function badRequest(message: string): Response {
+  return json({ error: message } satisfies ApiError, 400);
+}
+
 function safely(
   handler: (req: Request) => Response | Promise<Response>,
 ): (req: Request) => Promise<Response> {
@@ -73,7 +81,10 @@ function safely(
       return await handler(req);
     } catch (error) {
       console.error(`[studio] ${req.method} ${new URL(req.url).pathname}:`, error);
-      return json({ error: (error as Error).message } satisfies ApiError, 500);
+      // 403-style errors from the approval gate should be 4xx, not 500.
+      const msg = (error as Error).message || "internal error";
+      const status = /approval|approve|withdraw/i.test(msg) ? 403 : 500;
+      return json({ error: msg } satisfies ApiError, status);
     }
   };
 }
@@ -137,6 +148,8 @@ const server = Bun.serve({
         discovery.setTargetDir(body.path);
         configMgr.setTargetDir(body.path);
         launcher.setTargetDir(body.path);
+        approvalBook.setTargetDir(body.path);
+        profiles.setTargetDir(body.path);
         activeDb?.close();
         activeDb = null;
         return json(info);
@@ -273,7 +286,103 @@ const server = Bun.serve({
     "/api/studio/runs/:run_id/stop": {
       POST: safely((req) => {
         const runId = param(req, "run_id");
-        return json({ ok: launcher.stopRun(runId) });
+        return json({ ok: launcher.stopRun(runId, "user-stop") });
+      }),
+    },
+
+    "/api/studio/runs/:run_id/pause": {
+      POST: safely((req) => {
+        const runId = param(req, "run_id");
+        return json({ ok: launcher.pauseRun(runId) });
+      }),
+    },
+
+    "/api/studio/runs/:run_id/resume": {
+      POST: safely((req) => {
+        const runId = param(req, "run_id");
+        return json({ ok: launcher.resumeRun(runId) });
+      }),
+    },
+
+    // ── APPROVAL BOOK (server-side enforcement) ────────────────────────────
+
+    "/api/studio/approvals": safely(() => json(approvalBook.list())),
+
+    "/api/studio/approvals/:id": safely((req) => {
+      const a = approvalBook.get(param(req, "id"));
+      return a ? json(a) : notFound("approval not found");
+    }),
+
+    "/api/studio/approvals/create": {
+      POST: safely(async (req) => {
+        const body = (await req.json()) as {
+          specMarkdown: string;
+          specTitle: string;
+          rawAttachment?: string;
+          rawAttachmentName?: string;
+          approvedBy: string;
+          sections: { id: string; name: string }[];
+          summary: {
+            willHappen: string;
+            willUse: string;
+            willNotDo: string;
+            timeEstimate: string;
+            costEstimate: string;
+            canUndo: string;
+            cannotUndo: string;
+          };
+          workflowId: string;
+          workflowName: string;
+          promptPreview: string;
+        };
+        if (!body.specMarkdown?.trim()) return badRequest("spec is empty");
+        if (!body.workflowId) return badRequest("workflowId is required");
+        if (!body.approvedBy?.trim()) return badRequest("approvedBy is required");
+        return json(approvalBook.approve(body));
+      }),
+    },
+
+    "/api/studio/approvals/:id/withdraw": {
+      POST: safely((req) => {
+        const ok = approvalBook.withdraw(param(req, "id"));
+        return json({ ok });
+      }),
+    },
+
+    "/api/studio/approvals/:id/section": {
+      POST: safely(async (req) => {
+        const body = (await req.json()) as { sectionId: string; confirmed: boolean };
+        const updated = approvalBook.setSection(param(req, "id"), body.sectionId, body.confirmed);
+        return updated ? json(updated) : notFound("approval not found");
+      }),
+    },
+
+    // ── CONNECTION PROFILES ────────────────────────────────────────────────
+
+    "/api/studio/profiles": {
+      GET: safely(() => json(profiles.list())),
+      POST: safely(async (req) => {
+        const body = (await req.json()) as any;
+        if (body.defaultTokenCap != null) {
+          return json(profiles.setDefaultTokenCap(body.defaultTokenCap));
+        }
+        return json(profiles.upsert(body.profile));
+      }),
+    },
+
+    "/api/studio/profiles/fetch-models": {
+      POST: safely(async (req) => {
+        const body = (await req.json()) as { baseUrl: string; apiKey: string };
+        const res = await profiles.fetchModels(body.baseUrl, body.apiKey || "");
+        return json(res);
+      }),
+    },
+
+    "/api/studio/profiles/test": {
+      POST: safely(async (req) => {
+        const body = (await req.json()) as { baseUrl: string; model: string; apiKey: string };
+        const res = await profiles.testConnection(body);
+        return json(res);
       }),
     },
 

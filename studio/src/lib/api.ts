@@ -6,12 +6,17 @@
  */
 import type {
   AdwWorkflowInfo,
+  ApprovalBookSummary,
   ApprovalRecord,
+  ApprovalRecordV2,
+  ConnectionProfile,
+  ConnectionProfileStore,
   DiscoverySessionState,
   Envelope,
   EnvKeyStatus,
   Event,
   EventsPage,
+  FetchModelsResponse,
   GateResult,
   HealthResponse,
   LaunchRequest,
@@ -21,6 +26,7 @@ import type {
   SessionSummary,
   SssfConfig,
   TargetProject,
+  TestConnectionResponse,
 } from "@shared/types.ts";
 import type { EventRow, PromptsResponse } from "./types.ts";
 
@@ -161,6 +167,75 @@ export const getRunState = (runId: string) =>
 
 export const stopRun = (runId: string) =>
   req<{ ok: boolean }>(`/api/studio/runs/${runId}/stop`, { method: "POST" });
+
+export const pauseRun = (runId: string) =>
+  req<{ ok: boolean }>(`/api/studio/runs/${runId}/pause`, { method: "POST" });
+
+export const resumeRun = (runId: string) =>
+  req<{ ok: boolean }>(`/api/studio/runs/${runId}/resume`, { method: "POST" });
+
+// ── Studio: Approval Book ───────────────────────────────────────────────────
+
+export const listApprovals = () =>
+  req<ApprovalBookSummary[]>("/api/studio/approvals");
+
+export const getApproval = (id: string) =>
+  req<ApprovalRecordV2>(`/api/studio/approvals/${id}`);
+
+export const createApproval = (body: {
+  specMarkdown: string;
+  specTitle: string;
+  rawAttachment?: string;
+  rawAttachmentName?: string;
+  approvedBy: string;
+  sections: { id: string; name: string }[];
+  summary: ApprovalRecordV2["summary"];
+  workflowId: string;
+  workflowName: string;
+  promptPreview: string;
+}) =>
+  req<ApprovalRecordV2>("/api/studio/approvals/create", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const withdrawApproval = (id: string) =>
+  req<{ ok: boolean }>(`/api/studio/approvals/${id}/withdraw`, { method: "POST" });
+
+export const setApprovalSection = (id: string, sectionId: string, confirmed: boolean) =>
+  req<ApprovalRecordV2>(`/api/studio/approvals/${id}/section`, {
+    method: "POST",
+    body: JSON.stringify({ sectionId, confirmed }),
+  });
+
+// ── Studio: Connection Profiles ──────────────────────────────────────────────
+
+export const getProfiles = () =>
+  req<ConnectionProfileStore>("/api/studio/profiles");
+
+export const saveProfile = (profile: ConnectionProfile) =>
+  req<ConnectionProfileStore>("/api/studio/profiles", {
+    method: "POST",
+    body: JSON.stringify({ profile }),
+  });
+
+export const setDefaultTokenCap = (cap: number) =>
+  req<ConnectionProfileStore>("/api/studio/profiles", {
+    method: "POST",
+    body: JSON.stringify({ defaultTokenCap: cap }),
+  });
+
+export const fetchModels = (baseUrl: string, apiKey: string) =>
+  req<FetchModelsResponse>("/api/studio/profiles/fetch-models", {
+    method: "POST",
+    body: JSON.stringify({ baseUrl, apiKey }),
+  });
+
+export const testConnection = (baseUrl: string, model: string, apiKey: string) =>
+  req<TestConnectionResponse>("/api/studio/profiles/test", {
+    method: "POST",
+    body: JSON.stringify({ baseUrl, model, apiKey }),
+  });
 
 // ── Visualizer Observability Methods ────────────────────────────────────────
 

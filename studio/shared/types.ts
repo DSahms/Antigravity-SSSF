@@ -388,7 +388,7 @@ export interface LiveRunState {
   adwId: string;
   workflowId: string;
   workflowName: string;
-  status: "running" | "success" | "fail" | "stopped";
+  status: "running" | "success" | "fail" | "stopped" | "paused";
   startedAt: string;
   endedAt?: string;
   pid?: number;
@@ -396,4 +396,109 @@ export interface LiveRunState {
   promptPreview: string;
   logs: string[];
   currentPhase?: string;
+  /** Approval that authorized this run. Always non-null for a real run. */
+  approvalId?: string;
+  /** Reason for a stopped run ("token-cap" | "user-stop" | "user-pause-resumed" | ...) */
+  stopReason?: string;
+  /** Live token usage, populated as the run progresses. */
+  tokenUsage?: number;
+  tokenCap?: number;
+}
+
+// ── Approval Book (server-side enforcement) ────────────────────────────────
+
+export interface ApprovalSection {
+  id: string;
+  name: string;
+  confirmed: boolean;
+  confirmedAt?: string;
+}
+
+export interface ApprovalRecordV2 {
+  id: string;
+  specVersion: number;
+  specHash: string;
+  specMarkdown: string;
+  specTitle: string;
+  rawAttachment?: string;       // original uploaded/pasted text, verbatim
+  rawAttachmentName?: string;
+  approvedBy: string;
+  approvedAt: string;
+  withdrawnAt?: string;
+  sections: ApprovalSection[];
+  summary: {
+    willHappen: string;
+    willUse: string;
+    willNotDo: string;
+    timeEstimate: string;
+    costEstimate: string;
+    canUndo: string;
+    cannotUndo: string;
+  };
+  /** Workflow + prompt the approval authorizes; the launcher checks these. */
+  workflowId: string;
+  workflowName: string;
+  promptPreview: string;
+}
+
+export interface ApprovalBookSummary {
+  id: string;
+  specTitle: string;
+  specVersion: number;
+  approvedBy: string;
+  approvedAt: string;
+  withdrawnAt?: string;
+  workflowId: string;
+  workflowName: string;
+}
+
+// ── Connection Profiles ────────────────────────────────────────────────────
+
+export type ProviderKind = "local" | "cloud";
+
+export interface ConnectionProfile {
+  role: string;
+  label: string;
+  provider: ProviderKind;
+  baseUrl: string;
+  model: string;
+  apiKey: string;       // never logged; "none" for local
+  reasoningLevel?: string;
+  hideThinking?: boolean;
+  /** Disabled profiles cannot be selected for a run. Local is always enabled. */
+  disabled?: boolean;
+}
+
+export interface ConnectionProfileStore {
+  profiles: ConnectionProfile[];
+  /** Per-job token cap default. */
+  defaultTokenCap: number;
+}
+
+export interface FetchModelsResponse {
+  models: string[];
+  error?: string;
+}
+
+export interface TestConnectionResponse {
+  ok: boolean;
+  message: string;      // plain English, friendly
+  detail?: string;      // raw error for diagnostics
+}
+
+export interface TokenGuardConfig {
+  cap: number;          // 0 = no cap
+  perJob: Record<string, number>;  // optional per-run override
+}
+
+// ── Drafts (New Job autosave) ──────────────────────────────────────────────
+
+export interface NewJobDraft {
+  id: string;
+  savedAt: string;
+  mode: "talk" | "upload" | "paste";
+  text: string;          // talk textarea or pasted text or uploaded file text
+  fileName?: string;     // uploaded file name
+  specMarkdown: string; // current working spec
+  sections?: { id: string; name: string; body: string }[];
 }

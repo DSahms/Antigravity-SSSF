@@ -154,6 +154,9 @@ adws/adw_data/sessions/
 # of which would have stamped a fake trace db into every target repo.
 sssf.db*
 
+# CREW runtime — approval book + connection profiles + drafts (all per-target)
+.sssf/
+
 # demo app runtime (example branch)
 apps/inkwell/inkwell.db*
 
