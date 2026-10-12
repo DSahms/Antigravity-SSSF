@@ -33,6 +33,19 @@
   ],
   "runs": [
     {
+      "runId": "run-mv58qurl",
+      "adwId": "",
+      "workflowId": "adw_simple_sdlc.py",
+      "status": "fail",
+      "startedAt": "2026-10-12T12:41:23.265Z",
+      "endedAt": "2026-10-12T12:41:25.279Z",
+      "exitCode": 1,
+      "promptPreview": "Test",
+      "approvalId": "appr-mv58quqx0nhg",
+      "tokenUsage": 0,
+      "tokenCap": 5000
+    },
+    {
       "runId": "run-muzjtu67",
       "adwId": "",
       "workflowId": "adw_simple_sdlc.py",

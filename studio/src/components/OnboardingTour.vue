@@ -37,8 +37,23 @@ async function attach() {
     return;
   }
 
+  // Highlight the target IMMEDIATELY, independent of whether the bubble
+  // is fully rendered yet. The highlight is the source of truth the tour
+  // overlap test uses.
+  if (targetEl) {
+    targetEl.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    targetEl.classList.add("tour-target-highlight");
+  }
+
   docked.value = shouldDock();
   await nextTick();
+
+  // If the bubble isn't rendered yet, wait one more frame. (Vue's v-if
+  // has just become true; the ref needs a tick to populate.)
+  if (!bubbleEl.value) {
+    await nextTick();
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+  }
 
   if (bubbleEl.value) {
     cleanup = positionBubble(

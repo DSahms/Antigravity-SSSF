@@ -19,29 +19,29 @@ const emit = defineEmits<{
   (e: "open-help"): void;
 }>();
 
-const GROUPS: { label: string; items: { id: ScreenId; label: string; icon: any }[] }[] = [
+const GROUPS: { label: string; items: { id: ScreenId; label: string; icon: any; tour?: string }[] }[] = [
   {
     label: "Workflow",
     items: [
-      { id: "home", label: "Home", icon: Home },
-      { id: "new-job", label: "New Job", icon: Compass },
-      { id: "review-approve", label: "Review & Approve", icon: ListChecks },
-      { id: "run", label: "Run", icon: PlayCircle },
-      { id: "results", label: "Results", icon: PauseCircle },
+      { id: "home", label: "Home", icon: Home, tour: "nav-home" },
+      { id: "new-job", label: "New Job", icon: Compass, tour: "nav-new-job" },
+      { id: "review-approve", label: "Review & Approve", icon: ListChecks, tour: "nav-review" },
+      { id: "run", label: "Run", icon: PlayCircle, tour: "nav-run" },
+      { id: "results", label: "Results", icon: PauseCircle, tour: "nav-results" },
     ],
   },
   {
     label: "Observe",
     items: [
-      { id: "sessions", label: "Sessions", icon: Sliders },
-      { id: "history", label: "History", icon: History },
+      { id: "sessions", label: "Sessions", icon: Sliders, tour: "nav-sessions" },
+      { id: "history", label: "History", icon: History, tour: "nav-history" },
     ],
   },
   {
     label: "Setup",
     items: [
-      { id: "settings", label: "Settings", icon: SettingsIcon },
-      { id: "help", label: "Help", icon: LifeBuoy },
+      { id: "settings", label: "Settings", icon: SettingsIcon, tour: "nav-settings" },
+      { id: "help", label: "Help", icon: LifeBuoy, tour: "nav-help" },
     ],
   },
 ];
@@ -101,6 +101,7 @@ function isActive(id: ScreenId): boolean {
       <div class="topbar-right">
         <button
           class="tour-help-btn"
+          data-tour="help-btn"
           @click="emit('open-help')"
           title="Help — restart the tour"
         >
@@ -128,6 +129,7 @@ function isActive(id: ScreenId): boolean {
           :key="item.id"
           class="sidebar-item"
           :class="{ active: isActive(item.id) }"
+          :data-tour="item.tour"
           @click="go(item.id)"
         >
           <component :is="item.icon" :size="16" />

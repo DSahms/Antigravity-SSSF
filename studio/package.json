@@ -10,7 +10,10 @@
     "start": "bun run server/index.ts",
     "dev:all": "bun run server/index.ts & vite",
     "build": "vue-tsc --noEmit && vite build",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:tour": "vitest run test/tour-overlap.test.ts",
+    "test:approval": "vitest run test/approval-enforcement.test.ts"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
@@ -23,8 +26,11 @@
   "devDependencies": {
     "@types/bun": "^1.1.14",
     "@vitejs/plugin-vue": "^6",
+    "@vitest/browser": "^2",
+    "playwright": "^1.50",
     "typescript": "^5.7.2",
     "vite": "^7",
+    "vitest": "^2",
     "vue-tsc": "^3"
   }
 }

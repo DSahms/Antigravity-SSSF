@@ -6,7 +6,7 @@ import {
 import AppShell from "@/components/AppShell.vue";
 import OnboardingTour from "@/components/OnboardingTour.vue";
 import { getProjectInfo, setTargetDir, stampFactory } from "@/lib/api";
-import { nav, type ScreenId } from "@/lib/nav";
+import { nav } from "@/lib/nav";
 import type { TargetProject } from "@shared/types.ts";
 
 import HomeView from "@/views/HomeView.vue";
@@ -87,40 +87,6 @@ try {
 watch(nav, (v) => {
   try { localStorage.setItem(NAV_KEY, JSON.stringify(v)); } catch {}
 }, { deep: true });
-
-// Apply tour data-attributes to nav buttons (so the tour selectors work).
-// We do this via a watch on the active screen + a tiny nextTick.
-import { nextTick } from "vue";
-watch(() => nav.value.screen, async () => {
-  await nextTick();
-  const map: Record<string, string> = {
-    "new-job": "nav-new-job",
-    "review-approve": "nav-review",
-    "run": "nav-run",
-    "sessions": "nav-sessions",
-    "settings": "nav-settings",
-  };
-  // Find the sidebar items and tag them with data-tour attributes.
-  document.querySelectorAll(".sidebar-item").forEach((el) => {
-    el.removeAttribute("data-tour");
-  });
-  const cls = (nav.value.screen as ScreenId) && map[nav.value.screen as string];
-  if (cls) {
-    const items = document.querySelectorAll(".sidebar-item");
-    items.forEach((el) => {
-      const label = el.textContent?.trim().toLowerCase() ?? "";
-      if (cls === "nav-new-job" && label.includes("new job")) el.setAttribute("data-tour", "nav-new-job");
-      if (cls === "nav-review" && label.includes("approve")) el.setAttribute("data-tour", "nav-review");
-      if (cls === "nav-run" && label.includes("run")) el.setAttribute("data-tour", "nav-run");
-      if (cls === "nav-sessions" && label.includes("sessions")) el.setAttribute("data-tour", "nav-sessions");
-      if (cls === "nav-settings" && label.includes("settings")) el.setAttribute("data-tour", "nav-settings");
-    });
-  }
-  // Always tag the Help button in the topbar
-  document.querySelectorAll(".tour-help-btn").forEach((el, i) => {
-    if (i === 0) el.setAttribute("data-tour", "help-btn");
-  });
-}, { immediate: true });
 </script>
 
 <template>

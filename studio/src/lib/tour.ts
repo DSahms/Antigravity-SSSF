@@ -180,8 +180,11 @@ export function positionBubble(
   if (dockToBottom) {
     // Small-screen mode: dock to bottom edge, with a visible connector
     // (the arrow) but never over the target. We still scroll the target
-    // into view so the connector points at it.
+    // into view so the connector points at it AND we highlight it so the
+    // user (and the tour overlap test) can see which control the bubble
+    // is talking about.
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (target) target.classList.add("tour-target-highlight");
     return null;
   }
 
@@ -195,6 +198,9 @@ export function positionBubble(
     return null;
   }
 
+  // The highlight is independent of the bubble: add it now so the user
+  // (and the tour overlap test) can see which control the bubble is
+  // talking about, even if the bubble itself isn't fully positioned yet.
   target.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
   target.classList.add("tour-target-highlight");
 
