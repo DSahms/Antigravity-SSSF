@@ -16,7 +16,7 @@
 import { computed, ref } from "vue";
 import {
   autoUpdate, computePosition, flip, offset, shift, arrow, size,
-  type Placement, type MiddlewareState,
+  type Placement,
 } from "@floating-ui/dom";
 
 export interface TourStep {
@@ -204,10 +204,10 @@ export function positionBubble(
       flip({ fallbackPlacements: ["top", "bottom", "left", "right"] }),
       shift({ padding: 12 }),
       size({
-        apply({ availableWidth, availableHeight, elements }: MiddlewareState) {
+        apply({ availableWidth, availableHeight, elements }) {
           // Constrain the bubble to the available space so it never
           // overflows the viewport and never overlaps the target.
-          Object.assign(elements.floating.style, {
+          Object.assign((elements as any).floating.style, {
             maxWidth: `${Math.min(availableWidth - 24, 360)}px`,
             maxHeight: `${Math.max(availableHeight - 24, 120)}px`,
           });
