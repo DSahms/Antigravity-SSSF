@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "sssf-studio",
+      "name": "crew-platform",
       "dependencies": {
         "@floating-ui/dom": "^1.8.0",
         "@fontsource/inter": "^5",

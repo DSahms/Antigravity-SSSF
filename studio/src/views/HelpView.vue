@@ -15,9 +15,9 @@ const GLOSSARY: { term: string; def: string }[] = [
   { term: "Run", def: "A single execution of a workflow against an approved spec. Has a token cap. Can be paused or stopped." },
   { term: "Session", def: "The trace of a run: phases, agents, tool calls, gates, envelopes. Lives in the SQLite db." },
   { term: "Profile", def: "A saved model connection per role (base URL, model, key, reasoning level). Local is the default." },
-  { term: "Local profile", def: "KoboldCpp at 127.0.0.1:5001. Default for all roles and for all testing. No key needed." },
+  { term: "Local profile", def: "A connection to a service on this computer. It may be an LLM router that forwards requests to cloud models. Auto leaves model selection to that router." },
   { term: "Cloud profile", def: "Venice AI. Disabled until a VENICE_API_KEY is in .env. Never used in tests." },
-  { term: "Token cap", def: "A per-job limit on tokens. When the cap is reached, the run stops with a calm message. Defaults low so a runaway job can't drain your wallet." },
+  { term: "Token cap", def: "Crew stops when reported usage reaches this threshold. Reporting can lag; this is not an exact spending ceiling." },
 ];
 
 const PHONE_TIPS: string[] = [
@@ -31,6 +31,10 @@ const PHONE_TIPS: string[] = [
 <template>
   <div>
     <ScreenHeader screen="help" hide-step />
+    <div class="section-card">
+      <a class="btn btn-secondary" href="/manuals/users-manual/index.html" target="_blank" rel="noopener">User's Manual</a>
+      <a class="btn btn-secondary" href="/manuals/learners-manual/index.html" target="_blank" rel="noopener">Learner's Manual</a>
+    </div>
 
     <div class="help-cols">
       <div class="section-card">

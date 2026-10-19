@@ -124,13 +124,21 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             extensions=agent.harness_engineering,
             cwd=str(run.repo_root),
         )
-        result = agent_pi.run(
-            request,
-            on_event=_event_forwarder(run, phase, agent.name),
-            on_spawn=lambda pid: run.tracer.process_start(
-                run.adw_id, "agent", agent.name, pid,
-                f"{agent.coding_agent} {agent.name} {agent.model}"),
-            on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid))
+        forwarder = _event_forwarder(run, phase, agent.name)
+        def observe(event: dict) -> None:
+            forwarder(event)
+            if event.get("type") == "tool_execution_end":
+                permissions.enforce(run, phase, agent, tree_before)
+        try:
+            result = agent_pi.run(
+                request,
+                on_event=observe,
+                on_spawn=lambda pid: run.tracer.process_start(
+                    run.adw_id, "agent", agent.name, pid,
+                    f"{agent.coding_agent} {agent.name} {agent.model}"),
+                on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid))
+        finally:
+            permissions.enforce(run, phase, agent, tree_before)
         run.add_usage(result.tokens, result.cost)
         spent.merge(result.usage)
         latest = result
@@ -237,6 +245,11 @@ def _event_forwarder(run, phase: Phase, agent_name: str):
     tracker = agent_pi.ToolCallTracker()
 
     def forward(event: dict) -> None:
+        if event.get("type") == "message_end" and event.get("message", {}).get("role") == "assistant":
+            tokens = agent_pi._context_tokens(event["message"].get("usage", {}) or {})
+            run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
+                                         type="usage", name=agent_name, tokens=tokens,
+                                         payload={"agent": agent_name}))
         record = tracker.observe(event)
         if record is None:
             return

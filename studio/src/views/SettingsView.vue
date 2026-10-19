@@ -1,21 +1,30 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import {
-  AlertCircle, CheckCircle2, Clipboard, Eye, EyeOff, Key, Plug,
+  AlertCircle, CheckCircle2, Clipboard, Eye, EyeOff, Key, ListChecks, Plug,
   RefreshCw, Save,
 } from "lucide-vue-next";
 import ScreenHeader from "@/components/ScreenHeader.vue";
 import {
-  fetchModels, getProfiles, saveProfile, setDefaultTokenCap, testConnection,
+  fetchModels, getProfiles, getProjectQuality, saveProjectQuality, saveProfile,
+  setDefaultTokenCap, testConnection, applyConnectionToAll,
 } from "@/lib/api";
 import type {
   ConnectionProfile, ConnectionProfileStore, FetchModelsResponse,
-  TestConnectionResponse,
+  ProjectQualityState, QualityConfig, TestConnectionResponse,
 } from "@shared/types.ts";
 import ConfigView from "@/views/ConfigView.vue";
 
+const QUALITY_FIELDS = [
+  { key: "test", label: "Test", placeholder: "bun test" },
+  { key: "lint", label: "Lint", placeholder: "bun run lint" },
+  { key: "typecheck", label: "Typecheck", placeholder: "bunx vue-tsc --noEmit" },
+  { key: "build", label: "Build", placeholder: "bun run build" },
+] as const;
+type QualityKey = typeof QUALITY_FIELDS[number]["key"];
+
 const store = ref<ConnectionProfileStore | null>(null);
-const tab = ref<"profiles" | "token" | "roster">("profiles");
+const tab = ref<"profiles" | "token" | "quality" | "roster">("profiles");
 const activeRole = ref<string>("");
 const activeProvider = ref<"local" | "cloud">("local");
 
@@ -26,6 +35,16 @@ const showSecret = ref<Record<string, boolean>>({});
 const keyBuffer = ref<Record<string, string>>({});
 const modelsDropdown = ref<Record<string, string[]>>({});
 const saveOk = ref<Record<string, boolean>>({});
+const quality = ref<ProjectQualityState | null>(null);
+const qualityDraft = ref<Record<QualityKey, string>>({ test: "", lint: "", typecheck: "", build: "" });
+const qualityError = ref<string | null>(null);
+const qualitySaved = ref(false);
+
+function fillQuality(state: ProjectQualityState) {
+  for (const field of QUALITY_FIELDS) {
+    qualityDraft.value[field.key] = (state.config?.[field.key] ?? []).join(" ");
+  }
+}
 
 onMounted(async () => {
   try {
@@ -37,6 +56,12 @@ onMounted(async () => {
     }
   } catch (e) {
     console.error("Settings load failed:", e);
+  }
+  try {
+    quality.value = await getProjectQuality();
+    fillQuality(quality.value);
+  } catch (e: any) {
+    qualityError.value = e.message;
   }
 });
 
@@ -65,6 +90,10 @@ const roles = computed(() => {
 
 function key(p: ConnectionProfile): string {
   return `${p.role}:${p.provider}`;
+}
+async function handleApplyAll(p: ConnectionProfile) {
+  if (!confirm("Use this saved connection and model for every role? You can change individual roles afterward.")) return;
+  try { store.value = await applyConnectionToAll(p.role, p.provider); } catch (error: any) { alert(error.message); }
 }
 
 function maskedValue(p: ConnectionProfile): string {
@@ -97,7 +126,7 @@ async function pasteKey(p: ConnectionProfile) {
 async function handleFetchModels(p: ConnectionProfile) {
   busy.value[key(p)] = "fetch";
   try {
-    const res = await fetchModels(p.baseUrl, keyBuffer.value[key(p)] || p.apiKey);
+    const res = await fetchModels(p.baseUrl, keyBuffer.value[key(p)] || p.apiKey, p);
     fetchModelsResult.value[key(p)] = res;
     if (res.models?.length) {
       modelsDropdown.value[key(p)] = res.models;
@@ -114,6 +143,7 @@ async function handleTestConnection(p: ConnectionProfile) {
       p.baseUrl,
       p.model,
       keyBuffer.value[key(p)] || p.apiKey,
+      p,
     );
     testResult.value[key(p)] = res;
   } finally {
@@ -146,6 +176,52 @@ async function handleSaveCap() {
   } catch (e: any) { alert(e.message); }
 }
 
+/** Split a typed command into argv, honoring simple single/double quotes. */
+function parseArgv(input: string): string[] {
+  const out: string[] = [];
+  let current = "";
+  let quote: string | null = null;
+  let escaped = false;
+  for (const ch of input.trim()) {
+    if (escaped) { current += ch; escaped = false; continue; }
+    if (ch === "\\") { escaped = true; continue; }
+    if (quote) {
+      if (ch === quote) quote = null;
+      else current += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (/\s/.test(ch)) {
+      if (current) { out.push(current); current = ""; }
+      continue;
+    }
+    current += ch;
+  }
+  if (escaped) current += "\\";
+  if (quote) throw new Error("Close the quote in that command before saving.");
+  if (current) out.push(current);
+  return out;
+}
+
+async function handleSaveQuality() {
+  try {
+    const payload: QualityConfig = {};
+    for (const field of QUALITY_FIELDS) {
+      const argv = parseArgv(qualityDraft.value[field.key]);
+      if (argv.length) (payload as Record<string, string[]>)[field.key] = argv;
+    }
+    if (!Object.keys(payload).length) {
+      throw new Error("Add at least one real check (test, lint, typecheck, or build).");
+    }
+    quality.value = await saveProjectQuality(payload);
+    fillQuality(quality.value);
+    qualitySaved.value = true;
+    setTimeout(() => { qualitySaved.value = false; }, 2500);
+  } catch (e: any) {
+    alert(e.message);
+  }
+}
+
 const REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 </script>
 
@@ -156,6 +232,7 @@ const REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "m
     <div class="settings-tabs">
       <button class="tab-btn" :class="{ active: tab === 'profiles' }" @click="tab = 'profiles'">Connection profiles</button>
       <button class="tab-btn" :class="{ active: tab === 'token' }" @click="tab = 'token'">Token guard</button>
+      <button class="tab-btn" :class="{ active: tab === 'quality' }" @click="tab = 'quality'">Project checks</button>
       <button class="tab-btn" :class="{ active: tab === 'roster' }" @click="tab = 'roster'">Roster &amp; API keys</button>
     </div>
 
@@ -206,7 +283,9 @@ const REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "m
             <div class="field">
               <label class="field-label">Model</label>
               <div class="field-row">
-                <input type="text" v-model="activeProfile.model" list="models-list" />
+                <select v-model="activeProfile.model" aria-label="Model">
+                  <option v-for="m in [...new Set(['auto', activeProfile.model, ...(modelsDropdown[key(activeProfile)] ?? [])])]" :key="m" :value="m">{{ m }}</option>
+                </select>
                 <button class="btn btn-secondary btn-sm" :disabled="isBusy(activeProfile, 'fetch')" @click="handleFetchModels(activeProfile)">
                   <RefreshCw :size="13" :class="spinClass(activeProfile)" /> Fetch models
                 </button>
@@ -240,7 +319,7 @@ const REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "m
                 </button>
               </div>
               <div class="dim" style="font-size: 11.5px; margin-top: 4px;">
-                Keys are masked, never logged, and stored only in <code>.sssf/profiles.json</code> (gitignored).
+                Saved keys stay in private project settings, excluded from Git. You don't need to retype them.
               </div>
             </div>
 
@@ -261,6 +340,7 @@ const REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "m
             </div>
 
             <div class="action-row">
+              <button class="btn btn-secondary" @click="handleApplyAll(activeProfile)">Use saved connection for all roles</button>
               <button class="btn btn-secondary" :disabled="isBusy(activeProfile, 'test')" @click="handleTestConnection(activeProfile)">
                 <Plug :size="14" /> Test connection
               </button>
@@ -296,6 +376,51 @@ const REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "m
         </div>
         <div class="dim" style="font-size: 12px; margin-top: 6px;">
           Current: {{ store.defaultTokenCap.toLocaleString() }} tokens. Set 0 to disable the cap (not recommended).
+        </div>
+      </div>
+    </div>
+
+    <!-- PROJECT CHECKS TAB -->
+    <div v-if="tab === 'quality'">
+      <div class="section-card" style="max-width: 720px;">
+        <div class="section-label" style="display: flex; align-items: center; gap: 6px;">
+          <ListChecks :size="15" /> Project checks
+        </div>
+        <p class="dim" style="font-size: 13px; margin: 0 0 10px;">
+          Quality Gate and the build pipelines run these commands instead of asking an agent to guess. Add the real commands for this project; a passing placeholder is worse than a missing check.
+        </p>
+        <div v-if="quality" class="mono dim" style="font-size: 11.5px; margin-bottom: 8px;">{{ quality.path }}</div>
+        <div v-if="qualityError" class="test-result err">
+          <AlertCircle :size="15" />
+          <div>{{ qualityError }}</div>
+        </div>
+        <div v-else-if="quality?.exists && quality.config && Object.keys(quality.config).length" class="test-result ok">
+          <CheckCircle2 :size="15" />
+          <div>Checks configured: {{ Object.keys(quality.config).join(", ") }}</div>
+        </div>
+        <div v-else class="test-result err">
+          <AlertCircle :size="15" />
+          <div>No checks configured yet. Quality Gate and full builds are blocked until you add at least one.</div>
+        </div>
+        <div v-if="quality?.error" class="test-result err" style="margin-top: 8px;">
+          <AlertCircle :size="15" />
+          <div>{{ quality.error }}</div>
+        </div>
+
+        <div v-for="field in QUALITY_FIELDS" :key="field.key" class="field" style="margin-top: 12px;">
+          <label class="field-label" :for="`quality-${field.key}`">{{ field.label }} command</label>
+          <input
+            :id="`quality-${field.key}`"
+            v-model="qualityDraft[field.key]"
+            :placeholder="field.placeholder"
+            spellcheck="false"
+          />
+          <div class="dim" style="font-size: 11.5px; margin-top: 3px;">One command, split into arguments. Leave blank to omit this check.</div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn btn-primary" @click="handleSaveQuality"><Save :size="14" /> Save checks</button>
+          <span v-if="qualitySaved" class="badge badge-green">Saved</span>
         </div>
       </div>
     </div>

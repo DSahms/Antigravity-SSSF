@@ -17,11 +17,12 @@
  * tour overlap test (tour-overlap.test.ts).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 
-const TARGET_DIR = resolve("/tmp/crew-test-target");
+const TARGET_DIR = mkdtempSync(join(tmpdir(), "crew-approval-"));
 const PORT = 4701;
 
 let serverProcess: ChildProcess | null = null;
@@ -39,7 +40,6 @@ async function waitUntilUp(port: number, timeoutMs = 8000) {
 }
 
 beforeAll(async () => {
-  rmSync(TARGET_DIR, { recursive: true, force: true });
   mkdirSync(join(TARGET_DIR, "adws"), { recursive: true });
   mkdirSync(join(TARGET_DIR, "adws", "adw_sssf_config"), { recursive: true });
   mkdirSync(join(TARGET_DIR, "requests"), { recursive: true });
@@ -51,6 +51,11 @@ beforeAll(async () => {
   );
   writeFileSync(join(TARGET_DIR, ".env"), "");
   writeFileSync(join(TARGET_DIR, "adws", "adw_plan.py"), "# stub\n");
+  writeFileSync(join(TARGET_DIR, "adws", "adw_simple_sdlc.py"), "# alternate workflow stub\n");
+  writeFileSync(join(TARGET_DIR, ".gitignore"), ".sssf/\n.env\n");
+  for (const args of [["init"], ["add", "."], ["-c", "user.name=Test", "-c", "user.email=test@localhost", "commit", "-m", "baseline"]]) {
+    if (spawnSync("git", args, { cwd: TARGET_DIR, windowsHide: true }).status !== 0) throw new Error("Test Git setup failed");
+  }
 
   serverProcess = spawn("bun", ["run", "server/index.ts"], {
     cwd: process.cwd(),

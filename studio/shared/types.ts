@@ -17,6 +17,7 @@ export type EventType =
   | "handoff"
   | "gate_pass"
   | "gate_fail"
+  | "usage"
   | "log"
   | "error";
 
@@ -212,6 +213,33 @@ export interface ApiError {
 
 // ── SSSF Studio Project & Control Layer Types ──────────────────────────────
 
+export interface QualityConfig {
+  test?: string[];
+  lint?: string[];
+  typecheck?: string[];
+  build?: string[];
+}
+
+export interface ProjectQualityState {
+  path: string;
+  exists: boolean;
+  config: QualityConfig | null;
+  error?: string;
+}
+
+export interface DeliverableFile {
+  path: string;
+  name: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface ProjectDeliverables {
+  projectPath: string;
+  specs: DeliverableFile[];
+  changedFiles: string[];
+}
+
 export interface TargetProject {
   path: string;
   name: string;
@@ -289,6 +317,7 @@ export interface DiscoveryChatMessage {
 }
 
 export interface DiscoverySessionState {
+  ready?: boolean;
   id: string;
   title: string;
   rawInput: string;
@@ -415,6 +444,7 @@ export interface ApprovalSection {
 }
 
 export interface ApprovalRecordV2 {
+  executionHash?: string;
   id: string;
   specVersion: number;
   specHash: string;
@@ -470,6 +500,7 @@ export interface ConnectionProfile {
 }
 
 export interface ConnectionProfileStore {
+  selectedProviders?: Record<string, ProviderKind>;
   profiles: ConnectionProfile[];
   /** Per-job token cap default. */
   defaultTokenCap: number;

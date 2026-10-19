@@ -62,7 +62,7 @@ function clearSession() {
         </button>
 
         <nav class="crumbs">
-          <span class="crumb-root" @click="clearSession">SSSF Trace</span>
+          <span class="crumb-root" @click="clearSession">Crew Trace</span>
           <ChevronRight class="w-3.5 h-3.5 text-zinc-600" />
           <span :class="{ 'text-indigo-400 font-bold': !currentAdwId, 'text-zinc-400': currentAdwId }">
             Sessions

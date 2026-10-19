@@ -32,8 +32,8 @@ def operator_env() -> dict[str, str]:
     venv = env.pop("VIRTUAL_ENV", "")
     if not venv:
         return env
-    venv_bin = str(Path(venv) / "bin")
-    parts = [p for p in env.get("PATH", "").split(os.pathsep) if p and p != venv_bin]
+    venv_bins = {os.path.normcase(str(Path(venv) / name)) for name in ("bin", "Scripts")}
+    parts = [p for p in env.get("PATH", "").split(os.pathsep) if p and os.path.normcase(os.path.normpath(p)) not in venv_bins]
     env["PATH"] = os.pathsep.join(parts)
     return env
 

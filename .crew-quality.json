@@ -1,0 +1,6 @@
+{
+  "test": ["node", "studio/scripts/check.mjs"],
+  "lint": ["node", "studio/node_modules/vue-tsc/bin/vue-tsc.js", "--noEmit", "--project", "studio/tsconfig.json"],
+  "typecheck": ["node", "studio/node_modules/vue-tsc/bin/vue-tsc.js", "--noEmit", "--project", "studio/tsconfig.json"],
+  "build": ["bun", "run", "--cwd", "studio", "build"]
+}

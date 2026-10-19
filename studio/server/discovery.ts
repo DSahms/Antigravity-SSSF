@@ -6,6 +6,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { ProfileStore } from "./profiles.ts";
 import type {
   ApprovalRecord,
   DiscoveryAmbiguityItem,
@@ -28,11 +29,15 @@ export class DiscoveryEngine {
 
   setTargetDir(dir: string): void {
     this.targetDir = dir;
+    this.currentSession = null;
   }
 
   getCurrentSession(): DiscoverySessionState {
     if (!this.currentSession) {
-      this.currentSession = this.createInitialSession();
+      const file = join(this.targetDir, ".sssf", "interview.json");
+      try { this.currentSession = JSON.parse(readFileSync(file, "utf8")); } catch {}
+      this.currentSession ??= this.createInitialSession();
+      this.currentSession.isAnalyzing = false;
     }
     return this.currentSession;
   }
@@ -49,7 +54,7 @@ export class DiscoveryEngine {
           id: "msg-welcome",
           role: "assistant",
           content:
-            "👋 Welcome to SSSF Studio Discovery! Paste your rough description, upload a spec draft, or describe what you want to build. I will perform a deep architectural review across missing requirements, ambiguities, concrete suggestions, open questions, and risks.",
+            "Welcome to Crew Platform. What do you want to create? Paste or upload a description, or tell me in your own words. We'll work through the important details one at a time.",
           timestamp: new Date().toISOString(),
         },
       ],
@@ -59,11 +64,14 @@ export class DiscoveryEngine {
 
   resetSession(): DiscoverySessionState {
     this.currentSession = this.createInitialSession();
+    this.persist();
     return this.currentSession;
   }
 
   async analyzeDescription(input: string): Promise<DiscoverySessionState> {
+    if (!input.trim()) throw new Error("Describe what you want to create first.");
     const session = this.getCurrentSession();
+    if (session.isAnalyzing) throw new Error("The interviewer is still answering. Please wait.");
     session.rawInput = input;
     session.isAnalyzing = true;
 
@@ -79,31 +87,13 @@ export class DiscoveryEngine {
       timestamp: new Date().toISOString(),
     });
 
-    const analysis = this.generateStructuredReview(input);
-    const draftMarkdown = this.synthesizeSpecificationMarkdown(input, analysis);
+    return this.interview();
 
-    session.analysis = analysis;
-    session.specMarkdown = draftMarkdown;
-    session.isAnalyzing = false;
-
-    session.chatHistory.push({
-      id: "msg-" + (Date.now() + 1),
-      role: "assistant",
-      content: `I have analyzed your request: **"${session.title}"**.\n\n` +
-        `I identified **${analysis.missingRequirements.length} missing requirements**, ` +
-        `**${analysis.ambiguities.length} ambiguities**, ` +
-        `**${analysis.suggestions.length} concrete architectural suggestions**, ` +
-        `**${analysis.openQuestions.length} open questions**, and ` +
-        `**${analysis.risks.length} potential risks**.\n\n` +
-        `I have compiled an initial working specification draft in the document pane on the right. Review the suggestions and answer the open questions to refine it before approval.`,
-      timestamp: new Date().toISOString(),
-    });
-
-    return session;
   }
 
   async handleChatMessage(messageText: string): Promise<DiscoverySessionState> {
     const session = this.getCurrentSession();
+    if (session.isAnalyzing) throw new Error("The interviewer is still answering. Please wait.");
 
     session.chatHistory.push({
       id: "msg-" + Date.now(),
@@ -112,35 +102,8 @@ export class DiscoveryEngine {
       timestamp: new Date().toISOString(),
     });
 
-    // Check if the user is answering an open question or requesting changes
-    const lower = messageText.toLowerCase();
+    return this.interview();
 
-    // Check open questions matching
-    let answeredQuestion: DiscoveryQuestionItem | null = null;
-    if (session.analysis?.openQuestions) {
-      for (const q of session.analysis.openQuestions) {
-        if (!q.answered && (lower.includes(q.id) || lower.includes("yes") || lower.includes("no") || messageText.length > 5)) {
-          q.answer = messageText;
-          q.answered = true;
-          answeredQuestion = q;
-          break;
-        }
-      }
-    }
-
-    // Refine the specification markdown with this feedback
-    session.specMarkdown += `\n\n### Clarification (${new Date().toLocaleDateString()})\n- **Question / User Note**: ${messageText}\n- **Impact**: Clarifies system requirements for the planner and builder agents.`;
-
-    session.chatHistory.push({
-      id: "msg-" + (Date.now() + 1),
-      role: "assistant",
-      content: answeredQuestion
-        ? `Got it! I have recorded your answer for *"${answeredQuestion.question}"* and updated the specification draft accordingly.`
-        : `Understood. I have incorporated your clarification: *"${messageText.slice(0, 80)}..."* into the specification draft. You can continue refining or click **Approve Specification** when ready.`,
-      timestamp: new Date().toISOString(),
-    });
-
-    return session;
   }
 
   acceptSuggestion(suggestionId: string): DiscoverySessionState {
@@ -183,31 +146,62 @@ export class DiscoveryEngine {
     return session;
   }
 
-  answerQuestion(questionId: string, answer: string): DiscoverySessionState {
-    const session = this.getCurrentSession();
-    if (!session.analysis) return session;
-
-    const question = session.analysis.openQuestions.find((q) => q.id === questionId);
-    if (question) {
-      question.answer = answer;
-      question.answered = true;
-
-      session.specMarkdown += `\n\n- **Resolved Decision [${question.question}]**: ${answer}`;
-
-      session.chatHistory.push({
-        id: "msg-" + Date.now(),
-        role: "assistant",
-        content: `Recorded decision for: *"${question.question}"* → **${answer}**. Updated specification draft.`,
-        timestamp: new Date().toISOString(),
-      });
-    }
-    return session;
+  async answerQuestion(questionId: string, answer: string): Promise<DiscoverySessionState> {
+    const question = this.getCurrentSession().analysis?.openQuestions.find(q => q.id === questionId);
+    if (!question) throw new Error("That question has changed. Refresh the interview.");
+    return this.handleChatMessage(question.question + "\nAnswer: " + answer);
   }
 
   updateSpecMarkdown(markdown: string): DiscoverySessionState {
     const session = this.getCurrentSession();
     session.specMarkdown = markdown;
+    session.ready = false;
+    this.persist();
     return session;
+  }
+
+  private persist(): void {
+    const dir = join(this.targetDir, ".sssf");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "interview.json"), JSON.stringify(this.currentSession, null, 2));
+  }
+
+  private async interview(): Promise<DiscoverySessionState> {
+    const session = this.getCurrentSession();
+    session.isAnalyzing = true;
+    session.ready = false;
+    this.persist();
+    try {
+      const store = new ProfileStore(this.targetDir).list();
+      const provider = store.selectedProviders?.interviewer ?? "local";
+      const profile = store.profiles.find(p => p.role === "interviewer" && p.provider === provider && !p.disabled);
+      if (!profile) throw new Error("Save an interviewer connection in Settings first.");
+      const headers: Record<string, string> = { "content-type": "application/json" };
+      if (profile.apiKey && profile.apiKey !== "none") headers.authorization = `Bearer ${profile.apiKey}`;
+      const system = `You are Crew Platform's thoughtful software interviewer. Ask one useful question at a time, with up to three suggested answers. Draw out tacit knowledge, accessibility needs, priorities, constraints, and what success looks like. Be gentle and practical. Offer solutions to gaps; do not interrogate or silently invent answers. Preserve user statements and mark assumptions. Do not use tools or execute work. Return ONLY JSON: {"title":"short title","reply":"conversational response and next question if needed","ready":false,"questions":[{"question":"next necessary question","choices":["choice"]}],"specMarkdown":"# Title\\n\\n## Goal\\n...\\n\\n## Requirements\\n...\\n\\n## Acceptance Criteria\\n...\\n\\n## Boundaries\\n..."}. Mark ready true only when the goal, requirements, boundaries, and concrete acceptance checks are supplied, no required questions remain, and the user has been shown a summary. A user can explicitly scope a smaller deliverable. Final approval is always the user's choice. Current draft follows:\n${session.specMarkdown}`;
+      const response = await fetch(profile.baseUrl.replace(/\/+$/, "") + "/chat/completions", {
+        method: "POST", headers, signal: AbortSignal.timeout(120000),
+        body: JSON.stringify({ model: profile.model, messages: [{ role: "system", content: system }, ...session.chatHistory.slice(-24).map(m => ({ role: m.role, content: m.content }))], max_tokens: 4096 }),
+      });
+      if (!response.ok) throw new Error(`Interviewer connection returned HTTP ${response.status}. Check Settings → Test connection.`);
+      const data = await response.json() as any;
+      const text = data?.choices?.[0]?.message?.content;
+      if (typeof text !== "string") throw new Error("The interviewer returned no usable response.");
+      const result = JSON.parse(text.replace(/^\s*```(?:json)?\s*/, "").replace(/\s*```\s*$/, ""));
+      if (typeof result.title !== "string" || typeof result.reply !== "string" || typeof result.specMarkdown !== "string" || !Array.isArray(result.questions)) throw new Error("The interviewer response was incomplete. Try again; your input is saved.");
+      const questions = result.questions.map((q: any, i: number) => {
+        if (typeof q.question !== "string" || !Array.isArray(q.choices) || !q.choices.every((c: unknown) => typeof c === "string")) throw new Error("The interviewer returned an invalid question.");
+        return { id: `question-${Date.now()}-${i}`, question: q.question, choices: q.choices.slice(0, 3), answered: false };
+      });
+      session.title = result.title;
+      session.specMarkdown = result.specMarkdown;
+      session.analysis = { summary: result.reply, missingRequirements: [], ambiguities: [], suggestions: [], risks: [], openQuestions: questions };
+      session.ready = result.ready === true && questions.length === 0 && ["Goal", "Requirements", "Acceptance Criteria", "Boundaries"].every(h => new RegExp(`^## ${h}\\s*\\n\\S`, "m").test(result.specMarkdown));
+      session.chatHistory.push({ id: `msg-${Date.now()}`, role: "assistant", content: result.reply, timestamp: new Date().toISOString() });
+      return session;
+    } catch (error) {
+      throw new Error(error instanceof TypeError ? "Can't reach your LLM router. Start it, then try again. Your input is saved." : (error as Error).message);
+    } finally { session.isAnalyzing = false; this.persist(); }
   }
 
   approveSpecification(
@@ -221,6 +215,7 @@ export class DiscoveryEngine {
       mkdirSync(requestsDir, { recursive: true });
     }
 
+    if (!/^[a-zA-Z0-9_-]+(?:\.md)?$/.test(fileName)) throw new Error("Choose a simple specification filename.");
     const safeName = fileName.endsWith(".md") ? fileName : `${fileName}.md`;
     const targetFilePath = join(requestsDir, safeName);
 

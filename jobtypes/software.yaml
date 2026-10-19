@@ -1,0 +1,54 @@
+# sssf.config.yaml — SSSF Agent Roster (Managed by SSSF Studio)
+# One agent, one prompt, one purpose.
+defaults:
+  coding_agent: pi
+  model: google/gemini-3.6-flash
+  thinking: medium
+  tools:
+    - read
+    - bash
+    - edit
+    - write
+    - grep
+    - find
+    - ls
+  protected_files:
+    - adws/adw_modules/
+    - adws/adw_sssf_config/
+    - adws/adw_*.py
+  data_dir: adws/adw_data
+
+agents:
+  - name: software
+    model: google/gemini-3.6-flash
+    thinking: medium
+    purpose: Execute software development workflows with git integration.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/software/system.md
+      user: adws/adw_data/prompt_engineering/software/user.md
+    tools:
+      - read
+      - bash
+      - edit
+      - write
+      - grep
+      - find
+      - ls
+  - name: research-brief
+    model: google/gemini-3.6-flash
+    thinking: medium
+    purpose: Generate research briefs with citations and conflict analysis.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/research-brief/system.md
+      user: adws/adw_data/prompt_engineering/research-brief/user.md
+    tools:
+      - read
+      - grep
+      - find
+      - ls
+      - bash
+      - write
+      - subagent_create
+      - subagent_continue
+      - subagent_list
+      - subagent_remove

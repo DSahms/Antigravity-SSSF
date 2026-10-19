@@ -1,19 +1,19 @@
 {
-  "name": "sssf-studio",
+  "name": "crew-platform",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "SSSF Studio – Unified Control Layer for Super Simple Software Factory",
+  "description": "Crew Platform — guided creation with a Python workflow engine",
   "scripts": {
     "dev": "vite",
     "server": "bun run server/index.ts",
     "start": "bun run server/index.ts",
     "dev:all": "bun run server/index.ts & vite",
-    "build": "vue-tsc --noEmit && vite build",
-    "typecheck": "vue-tsc --noEmit",
-    "test": "vitest run",
-    "test:tour": "vitest run test/tour-overlap.test.ts",
-    "test:approval": "vitest run test/approval-enforcement.test.ts"
+    "build": "node node_modules/vue-tsc/bin/vue-tsc.js --noEmit && node node_modules/vite/bin/vite.js build",
+    "typecheck": "node node_modules/vue-tsc/bin/vue-tsc.js --noEmit",
+    "test": "bun test test/core.bun.test.ts",
+    "test:tour": "node node_modules/vitest/vitest.mjs run test/tour-overlap.test.ts",
+    "test:approval": "node node_modules/vitest/vitest.mjs run test/approval-enforcement.test.ts"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",

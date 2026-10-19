@@ -19,6 +19,7 @@ const profiles = ref<ConnectionProfileStore | null>(null);
 const currentRun = ref<LiveRunState | null>(null);
 const launching = ref(false);
 const autoScroll = ref(true);
+const windowsHost = /Windows/i.test(navigator.userAgent);
 const terminalContainer = ref<HTMLDivElement | null>(null);
 let pollInterval: any = null;
 
@@ -61,6 +62,7 @@ async function handleLaunch() {
     return;
   }
   if (launching.value) return;
+  if (!confirm(`Start this approved job using your saved connections and a ${tokenCap.value.toLocaleString()} token cap? Provider usage reporting can lag. Crew will work in the selected project.`)) return;
   launching.value = true;
   try {
     const run = await launchWorkflow({
@@ -107,15 +109,16 @@ function openResults() {
     <ScreenHeader screen="run">
       <template #actions>
         <template v-if="currentRun?.status === 'running' || currentRun?.status === 'paused'">
-          <button v-if="currentRun.status === 'running'" class="btn btn-secondary btn-sm" @click="handlePause">
+          <button v-if="currentRun.status === 'running' && !windowsHost" class="btn btn-secondary btn-sm" @click="handlePause">
             <Pause :size="14" /> Pause
           </button>
-          <button v-else class="btn btn-secondary btn-sm" @click="handleResume">
+          <button v-else-if="currentRun.status === 'paused'" class="btn btn-secondary btn-sm" @click="handleResume">
             <Play :size="14" /> Resume
           </button>
           <button class="btn btn-danger btn-sm" @click="handleStop">
             <Square :size="14" /> Stop
           </button>
+          <span v-if="windowsHost" class="dim">Windows: use Stop to end a job.</span>
         </template>
         <button v-if="currentRun && currentRun.status !== 'running' && currentRun.status !== 'paused'" class="btn btn-primary btn-sm" @click="openResults">
           See results <ArrowRight :size="14" />

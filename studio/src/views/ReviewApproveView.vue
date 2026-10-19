@@ -22,6 +22,7 @@ const approving = ref(false);
 
 // Per-section checkmarks (computed from the spec's markdown sections)
 const sectionChecks = ref<Record<string, boolean>>({});
+const QUALITY_WORKFLOWS = new Set(["adw_simple_sdlc.py", "adw_plan_build_test.py", "adw_build_test.py", "adw_quality.py"]);
 
 // Summary text (user can edit but doesn't have to)
 const summary = ref({
@@ -103,19 +104,25 @@ function parseSections(md: string) {
 const sectionsList = computed(() => parseSections(session.value?.specMarkdown ?? ""));
 const allSectionsConfirmed = computed(() => sectionsList.value.length > 0 && sectionsList.value.every(s => sectionChecks.value[s.id]));
 const chosenWorkflow = computed(() => workflows.value.find(w => w.id === selectedWorkflowId.value));
+const needsQualityConfig = computed(() => QUALITY_WORKFLOWS.has(selectedWorkflowId.value));
 
 function prefillSummary(s: DiscoverySessionState) {
   const wf = workflows.value.find(w => w.id === selectedWorkflowId.value);
+  const stages = wf?.phases?.filter(p => p !== "request").join(" → ") || "plan";
   summary.value = {
-    willHappen: `Run ${wf?.name ?? "the chosen workflow"} against your approved spec. The factory will plan, build, test, review, and document the change, committing as it goes (depending on the workflow).`,
-    willUse: `Your local model profiles by default. The approved spec text. The current roster in sssf.config.yaml. No cloud calls unless you explicitly configure a cloud profile.`,
-    willNotDo: `It will not modify protected factory files. It will not run beyond the token cap you set in Settings. It will not push to a remote.`,
-    timeEstimate: `Roughly 1–5 minutes for a small change, longer for big ones. Watch the live console on the Run screen.`,
-    costEstimate: `Local profile: free (your own compute). Cloud (Venice): a few cents per thousand tokens, capped at your default token cap.`,
+    willHappen: `Run ${wf?.name ?? "the chosen workflow"} against your approved spec. Stages: ${stages}. The factory commits as it goes when the workflow supports it.`,
+    willUse: `Your saved connections, including your router's auto model selection. A local router may forward requests to external providers. Your approved brief and chosen workflow.`,
+    willNotDo: `Crew stops the process tree when reported usage reaches the token cap. Reporting can lag, so the cap is not an exact spending ceiling. It will not push to a remote.`,
+    timeEstimate: `Depends on scope, models, checks, and repair rounds. Watch progress on the Run screen.`,
+    costEstimate: `Depends on the providers selected by your router. A localhost address does not mean free inference. Check your router's pricing and limits.`,
     canUndo: `The factory's commits can be reverted with git. You can stop the run any time. The approval can be withdrawn before the run starts.`,
     cannotUndo: `If the builder edits a file outside git tracking, that change is on disk. (Protected files prevent this for factory code.) Once a run finishes, the commits are real.`,
   };
 }
+
+watch(selectedWorkflowId, () => {
+  if (session.value && !recordedApproval.value) prefillSummary(session.value);
+});
 
 async function handleApprove() {
   if (!session.value || !chosenWorkflow.value) return;
@@ -274,6 +281,9 @@ async function toggleSection(sectionId: string) {
               <option v-for="w in workflows" :key="w.id" :value="w.id">{{ w.name }} <template v-if="w.badge">— {{ w.badge }}</template></option>
             </select>
             <div class="dim" style="font-size: 12px; margin-top: 4px;">{{ chosenWorkflow?.description }}</div>
+            <div v-if="needsQualityConfig" class="sum-note">
+              This workflow runs deterministic checks. Configure the real commands in Settings → Project checks first; Crew refuses to start without them.
+            </div>
           </div>
         </div>
 
@@ -347,6 +357,7 @@ async function toggleSection(sectionId: string) {
 .section-row-name { font-weight: 500; }
 .quick-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 
+.sum-note { margin-top: 6px; padding: 6px 8px; font-size: 12px; color: var(--amber); background: color-mix(in srgb, var(--amber) 10%, transparent); border: 1px solid color-mix(in srgb, var(--amber) 28%, transparent); border-radius: var(--radius-sm); }
 .sum-row { margin-bottom: 10px; }
 .sum-label { font-size: 12.5px; font-weight: 600; color: var(--dim); margin-bottom: 4px; }
 .sum-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

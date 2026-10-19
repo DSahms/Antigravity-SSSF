@@ -9,12 +9,31 @@ import SessionTrace from "@/components/visualizer/SessionTrace.vue";
 import { getHealth } from "@/lib/api";
 import type { HealthResponse } from "@shared/types.ts";
 import { nav } from "@/lib/nav";
+import { navigate, useRoute } from "@/lib/router";
 
-const currentAdwId = ref<string | null>(nav.value.adwId ?? null);
-const currentPhaseId = ref<string | null>(null);
+const route = useRoute();
+const currentAdwId = ref<string | null>(nav.value.adwId ?? route.value.adwId ?? null);
+const currentPhaseId = ref<string | null>(route.value.phaseId);
 const health = ref<HealthResponse | null>(null);
 
-watch(() => nav.value.adwId, (v) => { if (v) currentAdwId.value = v; });
+// The trace and its phase blocks own the hash. Mirror it into the view so
+// deep links, back/forward, and phase clicks all open the same panel.
+watch(route, (r) => {
+  if (r.adwId) {
+    currentAdwId.value = r.adwId;
+    currentPhaseId.value = r.phaseId;
+    if (nav.value.adwId !== r.adwId) nav.value = { ...nav.value, adwId: r.adwId };
+  } else if (!nav.value.adwId) {
+    currentAdwId.value = null;
+    currentPhaseId.value = null;
+  }
+}, { immediate: true });
+
+watch(() => nav.value.adwId, (v) => {
+  if (!v) return;
+  currentAdwId.value = v;
+  if (route.value.adwId !== v) navigate(v, null);
+});
 
 onMounted(async () => {
   try { health.value = await getHealth(); } catch {}
@@ -24,12 +43,14 @@ function selectSession(adwId: string) {
   currentAdwId.value = adwId;
   currentPhaseId.value = null;
   nav.value = { ...nav.value, adwId };
+  navigate(adwId, null);
 }
 function clearSession() {
   currentAdwId.value = null;
   currentPhaseId.value = null;
   const { adwId, ...rest } = nav.value;
   nav.value = rest;
+  navigate(null, null);
 }
 </script>
 

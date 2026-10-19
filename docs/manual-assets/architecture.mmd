@@ -1,0 +1,11 @@
+flowchart LR
+  UI[Vue interface] --> API[Bun API]
+  API --> Intake[Interviewer]
+  Intake --> Router[LLM router]
+  API --> Approval[Versioned approval]
+  Approval --> Python[Python workflow]
+  Python --> Pi[Pi agent]
+  Pi --> Router
+  Python --> Trace[(SQLite trace)]
+  Trace --> UI
+  Python --> Output[Project outputs]

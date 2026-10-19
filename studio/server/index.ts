@@ -3,7 +3,7 @@
  *
  * Serves the unified control layer API and embedded visualizer observability data.
  */
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, readFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { SssfDb } from "./db.ts";
 import { ProjectManager } from "./project.ts";
@@ -14,14 +14,30 @@ import { ApprovalBook } from "./approvals.ts";
 import { ProfileStore } from "./profiles.ts";
 import type { AgentPrompts, ApiError, HealthResponse } from "../shared/types.ts";
 
-const PORT = Number(process.env.STUDIO_PORT ?? process.env.PORT ?? 4620);
+function readPort(): number {
+  const raw = process.env.STUDIO_PORT;
+  if (!raw) return 4620;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > 65535) {
+    throw new Error("STUDIO_PORT must be a whole number between 1 and 65535.");
+  }
+  return value;
+}
+
+// Deliberately ignore a generic PORT variable. Some shells and test runners set
+// PORT=0; binding a random port while Start-Crew and the browser use 4620 makes
+// the app look reachable but rejects every state-changing request.
+const PORT = readPort();
+let listeningPort = PORT;
 const FACTORY_ROOT = resolve(import.meta.dir, "..", "..");
 const DIST_DIR = resolve(import.meta.dir, "..", "dist");
 
 // Default target project directory is the factory workspace root
+let savedTarget = FACTORY_ROOT;
+try { const saved = JSON.parse(readFileSync(join(FACTORY_ROOT, ".sssf", "active-project.json"), "utf8")); if (typeof saved.path === "string" && existsSync(saved.path)) savedTarget = saved.path; } catch {}
 const initialTargetDir = process.env.TARGET_DIR
   ? resolve(process.env.TARGET_DIR)
-  : FACTORY_ROOT;
+  : savedTarget;
 
 console.log(`[studio] Factory root:  ${FACTORY_ROOT}`);
 console.log(`[studio] Initial target: ${initialTargetDir}`);
@@ -58,7 +74,6 @@ function json(data: unknown, status = 200): Response {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
-      "access-control-allow-origin": "*",
       "access-control-allow-methods": "GET, POST, OPTIONS, PUT, DELETE",
       "access-control-allow-headers": "content-type",
     },
@@ -73,11 +88,32 @@ function badRequest(message: string): Response {
   return json({ error: message } satisfies ApiError, 400);
 }
 
+function isAllowedOrigin(origin: string): boolean {
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    if (!["localhost", "127.0.0.1"].includes(parsed.hostname)) return false;
+    const port = Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80));
+    // The real bound port, not the requested one: STUDIO_PORT can be changed
+    // and tests may bind an ephemeral port.
+    return port === listeningPort || (parsed.protocol === "http:" && port === 5173);
+  } catch {
+    return false;
+  }
+}
+
 function safely(
   handler: (req: Request) => Response | Promise<Response>,
 ): (req: Request) => Promise<Response> {
   return async (req) => {
     try {
+      const url = new URL(req.url);
+      if (!["localhost", "127.0.0.1"].includes(url.hostname)) return json({ error: "Invalid host" }, 403);
+      const origin = req.headers.get("origin");
+      if (origin && !isAllowedOrigin(origin)) {
+        return json({ error: "This request must come from Crew Platform." }, 403);
+      }
+      if (req.headers.get("sec-fetch-site") === "cross-site") return json({ error: "Cross-site request rejected" }, 403);
       return await handler(req);
     } catch (error) {
       console.error(`[studio] ${req.method} ${new URL(req.url).pathname}:`, error);
@@ -109,6 +145,14 @@ function intQuery(req: Request, key: string, fallback: number): number {
 
 async function serveStatic(req: Request): Promise<Response> {
   const { pathname } = new URL(req.url);
+  if (pathname.startsWith("/manuals/")) {
+    const relative = pathname.slice("/manuals/".length);
+    const base = resolve(FACTORY_ROOT, "docs");
+    const path = resolve(base, relative);
+    if (!path.startsWith(base + sep)) return notFound("invalid manual path");
+    if (existsSync(path) && statSync(path).isFile()) return new Response(Bun.file(path));
+    return notFound("manual not found");
+  }
 
   if (!existsSync(DIST_DIR)) {
     return new Response(
@@ -135,6 +179,7 @@ async function serveStatic(req: Request): Promise<Response> {
 }
 
 const server = Bun.serve({
+  hostname: "127.0.0.1",
   port: PORT,
   routes: {
     // ── STUDIO PROJECT ENDPOINTS ──────────────────────────────────────────
@@ -144,6 +189,8 @@ const server = Bun.serve({
     "/api/studio/project/select": {
       POST: safely(async (req) => {
         const body = (await req.json()) as { path: string };
+        if (discovery.getCurrentSession().isAnalyzing) return badRequest("Wait for the interviewer before switching projects.");
+        if (launcher.getActiveRuns().some(r => r.status === "running" || r.status === "paused")) return badRequest("Stop the current job before switching projects.");
         const info = projectMgr.setTargetDir(body.path);
         discovery.setTargetDir(body.path);
         configMgr.setTargetDir(body.path);
@@ -152,6 +199,29 @@ const server = Bun.serve({
         profiles.setTargetDir(body.path);
         activeDb?.close();
         activeDb = null;
+        return json(info);
+      }),
+    },
+
+    "/api/studio/project/deliverables": safely(() => json(projectMgr.getDeliverables())),
+
+    "/api/studio/project/quality": {
+      GET: safely(() => json(projectMgr.getQualityConfig())),
+      POST: safely(async (req) => {
+        const body = await req.json();
+        return json(projectMgr.saveQualityConfig(body));
+      }),
+    },
+
+    "/api/studio/project/create": {
+      POST: safely(async req => {
+        if (discovery.getCurrentSession().isAnalyzing) return badRequest("Wait for the interviewer before creating another project.");
+        if (launcher.getActiveRuns().some(r => r.status === "running" || r.status === "paused")) return badRequest("Stop the current job before creating another project.");
+        const body = await req.json() as { name: string };
+        const info = projectMgr.createProject(body.name);
+        discovery.setTargetDir(info.path); configMgr.setTargetDir(info.path);
+        launcher.setTargetDir(info.path); approvalBook.setTargetDir(info.path); profiles.setTargetDir(info.path);
+        activeDb?.close(); activeDb = null;
         return json(info);
       }),
     },
@@ -201,7 +271,7 @@ const server = Bun.serve({
     "/api/studio/discovery/question/answer": {
       POST: safely(async (req) => {
         const body = (await req.json()) as { id: string; answer: string };
-        return json(discovery.answerQuestion(body.id, body.answer));
+        return json(await discovery.answerQuestion(body.id, body.answer));
       }),
     },
 
@@ -251,7 +321,9 @@ const server = Bun.serve({
     "/api/studio/rosters/apply": {
       POST: safely(async (req) => {
         const body = (await req.json()) as { name: string };
-        return json({ config: configMgr.applyRosterPreset(body.name) });
+        const config = configMgr.applyRosterPreset(body.name);
+        profiles.setTargetDir(projectMgr.getTargetDir());
+        return json({ config });
       }),
     },
 
@@ -360,7 +432,7 @@ const server = Bun.serve({
     // ── CONNECTION PROFILES ────────────────────────────────────────────────
 
     "/api/studio/profiles": {
-      GET: safely(() => json(profiles.list())),
+      GET: safely(() => json(profiles.publicList())),
       POST: safely(async (req) => {
         const body = (await req.json()) as any;
         if (body.defaultTokenCap != null) {
@@ -372,16 +444,23 @@ const server = Bun.serve({
 
     "/api/studio/profiles/fetch-models": {
       POST: safely(async (req) => {
-        const body = (await req.json()) as { baseUrl: string; apiKey: string };
-        const res = await profiles.fetchModels(body.baseUrl, body.apiKey || "");
+        const body = (await req.json()) as { baseUrl: string; apiKey: string; role?: string; provider?: string };
+        const res = await profiles.fetchModels(body.baseUrl, profiles.connectionKey(body));
         return json(res);
+      }),
+    },
+
+    "/api/studio/profiles/apply-all": {
+      POST: safely(async req => {
+        const body = await req.json() as { role: string; provider: string };
+        return json(profiles.applyToAll(body.role, body.provider));
       }),
     },
 
     "/api/studio/profiles/test": {
       POST: safely(async (req) => {
-        const body = (await req.json()) as { baseUrl: string; model: string; apiKey: string };
-        const res = await profiles.testConnection(body);
+        const body = (await req.json()) as { baseUrl: string; model: string; apiKey: string; role?: string; provider?: string };
+        const res = await profiles.testConnection({ ...body, apiKey: profiles.connectionKey(body) });
         return json(res);
       }),
     },
@@ -481,7 +560,6 @@ const server = Bun.serve({
     if (req.method === "OPTIONS") {
       return new Response(null, {
         headers: {
-          "access-control-allow-origin": "*",
           "access-control-allow-methods": "GET, POST, OPTIONS, PUT, DELETE",
           "access-control-allow-headers": "content-type",
         },
@@ -494,4 +572,5 @@ const server = Bun.serve({
   },
 });
 
-console.log(`[studio] SSSF Studio API running at http://localhost:${server.port}`);
+listeningPort = server.port ?? PORT;
+console.log(`[studio] Crew Platform API running at http://127.0.0.1:${server.port}`);

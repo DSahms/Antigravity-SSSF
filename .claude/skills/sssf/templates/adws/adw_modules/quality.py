@@ -33,6 +33,7 @@ from __future__ import annotations
 import shlex
 import subprocess
 import time
+import json
 from pathlib import Path
 from typing import Callable
 
@@ -50,6 +51,16 @@ def _placeholder(name: str) -> list[str]:
     """A command that does nothing and admits it. Replace every call to this."""
     return ["echo", f"PLACEHOLDER {name}: edit adws/adw_modules/quality.py and "
                     f"replace this echo with the real {name} command"]
+
+
+def _command(run, name: str) -> list[str]:
+    path = Path(run.repo_root) / ".crew-quality.json"
+    if not path.is_file():
+        raise RuntimeError("No real validation configured. Add .crew-quality.json with test, lint, typecheck, and build argv lists before running verification.")
+    argv = json.loads(path.read_text()).get(name)
+    if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
+        raise RuntimeError(f"Configure a real {name} command in .crew-quality.json.")
+    return argv
 
 
 def _check_dir(run, name: str) -> Path:
@@ -85,8 +96,9 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
         stderr = completed.stderr
     except subprocess.TimeoutExpired as error:
         returncode = 124
-        stdout = error.stdout or ""
-        stderr = (error.stderr or "") + f"\nTimed out after {spec.timeout_seconds}s."
+        stdout = error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""
+        stderr = error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""
+        stderr += f"\nTimed out after {spec.timeout_seconds}s."
     except OSError as error:
         # A missing binary lands here as exit 127 with the real message — no
         # pre-flight probe needed, and none wanted.
@@ -141,7 +153,7 @@ def test(run) -> QualityCheckResult:
         name="test",
         area="backend",
         operation="build",
-        argv=_placeholder("test"),        # e.g. ["bun", "test"] or ["uv", "run", "pytest", "-q"]
+        argv=_command(run, "test"),
         timeout_seconds=600,
     ), run)
 
@@ -151,7 +163,7 @@ def lint(run) -> QualityCheckResult:
         name="lint",
         area="backend",
         operation="lint",
-        argv=_placeholder("lint"),        # e.g. ["bun", "x", "oxlint@1.36.0", "src"]
+        argv=_command(run, "lint"),
     ), run)
 
 
@@ -160,7 +172,7 @@ def typecheck(run) -> QualityCheckResult:
         name="typecheck",
         area="backend",
         operation="typecheck",
-        argv=_placeholder("typecheck"),   # e.g. ["bun", "x", "tsc", "--noEmit"]
+        argv=_command(run, "typecheck"),
     ), run)
 
 
@@ -170,7 +182,7 @@ def build(run) -> QualityCheckResult:
         name="build",
         area="backend",
         operation="build",
-        argv=_placeholder("build"),       # e.g. ["bun", "build", "src/index.ts", "--outdir", str(output_dir)]
+        argv=_command(run, "build"),
     ), run)
 
 

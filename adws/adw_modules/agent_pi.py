@@ -12,6 +12,9 @@ import json
 import os
 import subprocess
 import time
+import shutil
+import threading
+from collections import deque
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Optional
@@ -22,6 +25,16 @@ from .utils import now_iso, operator_env
 PI_PATH = os.environ.get("PI_PATH", "pi")
 MODELS_JSON = os.environ.get("PI_MODELS_PATH",
                              str(Path.home() / ".pi" / "agent" / "models.json"))
+
+
+def _pi_command() -> list[str]:
+    """Run the Windows Node entry point without putting prompts through cmd.exe."""
+    binary = shutil.which(PI_PATH) or PI_PATH
+    if os.name == "nt":
+        cli = Path(binary).parent / "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
+        if cli.is_file():
+            return [shutil.which("node") or "node", str(cli)]
+    return [binary]
 
 RESULT_SNIPPET_CHARS = 20_000   # tool output rides along whole; clip only guards pathological cases
 ARG_VALUE_CHARS = 20_000        # args too — the UI scrolls, it must not be handed cut-off data
@@ -45,7 +58,7 @@ def _pi_catalog() -> list[tuple[str, str, int]]:
     """Read pi's merged catalog, including built-in providers and custom models."""
     try:
         result = subprocess.run(
-            [PI_PATH, "--list-models"], capture_output=True, text=True,
+            [*_pi_command(), "--list-models"], capture_output=True, text=True,
             timeout=30, env=operator_env(), check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -71,6 +84,11 @@ def resolve_model(pattern: str) -> tuple[str, str]:
     that same merged view lets SSSF target direct providers such as
     ``openai/gpt-5.6-terra`` without re-registering built-in models locally.
     """
+    if Path(MODELS_JSON).is_file() and "/" in pattern:
+        provider, model_id = pattern.split("/", 1)
+        registry = json.loads(Path(MODELS_JSON).read_text())
+        if any(m.get("id") == model_id for m in registry.get("providers", {}).get(provider, {}).get("models", [])):
+            return provider, model_id
     catalog = [(provider, model_id) for provider, model_id, _ in _pi_catalog()]
     if "/" in pattern:
         provider, model_id = pattern.split("/", 1)
@@ -107,7 +125,7 @@ def _context_tokens(usage: dict) -> int:
 
 def context_window(provider: str, model_id: str) -> int:
     """The model's context ceiling from pi's merged model catalog."""
-    registry = json.loads(Path(MODELS_JSON).read_text())
+    registry = json.loads(Path(MODELS_JSON).read_text()) if Path(MODELS_JSON).is_file() else {}
     for model in registry.get("providers", {}).get(provider, {}).get("models", []):
         if model.get("id") == model_id:
             return int(model.get("contextWindow") or 0)
@@ -216,7 +234,7 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
     """
     provider, model_id = resolve_model(request.model)
     cmd = [
-        PI_PATH, "-p", "--mode", "json",
+        *_pi_command(), "-p", "--mode", "json",
         "--provider", provider, "--model", model_id,
         "--thinking", request.thinking,
         "--session-id", request.session_id,
@@ -225,6 +243,8 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
     ]
     if request.tools:
         cmd += ["--tools", ",".join(request.tools)]
+    elif request.tools == []:
+        cmd += ["--no-tools"]
     for extension in request.extensions:
         cmd += ["-e", extension]
     cmd.append(request.prompt)
@@ -242,8 +262,15 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
     # a run that sat idle at 0% CPU with an empty raw_output.jsonl.
     process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               text=True, bufsize=1, cwd=request.cwd,
+                               text=True, encoding="utf-8", errors="replace", bufsize=1, cwd=request.cwd,
                                env=operator_env())
+    stderr_chunks = deque(maxlen=256)
+    def drain_stderr():
+        if process.stderr:
+            for chunk in iter(lambda: process.stderr.read(4096), ""):
+                stderr_chunks.append(chunk)
+    stderr_thread = threading.Thread(target=drain_stderr, daemon=True)
+    stderr_thread.start()
     if on_spawn:
         on_spawn(process.pid)
     with raw_path.open("a") as raw:
@@ -275,12 +302,23 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
                         result.context_tokens = turn
                     result.cost += (usage.get("cost", {}) or {}).get("total", 0.0) or 0.0
             if on_event:
-                on_event(event)
+                try:
+                    on_event(event)
+                except BaseException:
+                    if os.name == "nt":
+                        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+                    else:
+                        process.terminate()
+                    process.wait()
+                    if on_exit:
+                        on_exit(process.pid)
+                    raise
 
-    stderr = process.stderr.read() if process.stderr else ""
     result.returncode = process.wait()
+    stderr_thread.join(timeout=2)
+    stderr = "".join(stderr_chunks)
     if on_exit:
         on_exit(process.pid)
-    if result.returncode != 0 and not result.text:
+    if result.returncode != 0:
         raise RuntimeError(f"pi exited {result.returncode}: {stderr.strip()[-800:]}")
     return result

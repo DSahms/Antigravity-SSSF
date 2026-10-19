@@ -167,7 +167,7 @@ const chosenWf = computed(() => {
           </span>
         </div>
         <p class="text-xs text-zinc-400">
-          Execute Super Simple Software Factory ADWs against the target repository with approved specifications.
+          Execute Crew workflow engine ADWs against the target repository with approved specifications.
         </p>
       </div>
 

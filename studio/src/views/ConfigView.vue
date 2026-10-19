@@ -211,7 +211,7 @@ async function handleSaveKey(keyName: string) {
         <div class="title-row">
           <Sliders class="w-5 h-5 text-indigo-400" />
           <h2 class="text-xl font-bold tracking-wide">Agent Roster Configuration</h2>
-          <span class="badge badge-purple font-mono text-xs">sssf.config.yaml</span>
+          <span class="badge badge-purple font-mono text-xs">Active roster</span>
         </div>
         <p class="text-xs text-zinc-400">
           Visual tuning for models, thinking levels, tool allowlists, and write boundaries per agent.
@@ -403,16 +403,18 @@ async function handleSaveKey(keyName: string) {
             <!-- Model Override -->
             <div class="space-y-1">
               <label class="text-xs text-zinc-400 font-bold flex items-center justify-between">
-                <span>Model Override</span>
+                <span>Legacy model reference</span>
                 <span class="text-zinc-500 font-normal">
                   {{ agent.model ? "Custom" : "(Inherits default)" }}
                 </span>
               </label>
               <input
                 v-model="agent.model"
+                disabled
                 class="text-input text-xs font-mono"
                 :placeholder="config.defaults.model"
               />
+              <p class="dim">Choose the actual model in Connection profiles. Saving a custom roster also saves those connections privately.</p>
             </div>
 
             <!-- Thinking Override -->
@@ -576,7 +578,7 @@ async function handleSaveKey(keyName: string) {
         </div>
         <div class="p-6 space-y-4">
           <p class="text-xs text-zinc-300">
-            Saves this active configuration as a reusable named roster in <code>adws/adw_sssf_config/rosters/</code>.
+            Saves this roster and a private snapshot of your current connections for easy recall.
           </p>
           <div class="space-y-1">
             <label class="text-xs font-bold text-zinc-300">Preset Name</label>

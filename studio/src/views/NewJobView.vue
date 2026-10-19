@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   ArrowRight, Clipboard, FileUp, FileText, HelpCircle, History,
   Lightbulb, MessageSquare, RotateCcw, Save, Send, Sparkles, Upload, X,
@@ -12,6 +12,7 @@ import {
   analyzeDescription, answerQuestion, getDiscoverySession,
   rejectSuggestion, acceptSuggestion, resetDiscoverySession,
   sendChatMessage, updateSpecMarkdown,
+  getProjectInfo,
 } from "@/lib/api";
 import { go } from "@/lib/nav";
 
@@ -19,6 +20,27 @@ const session = ref<DiscoverySessionState | null>(null);
 const loading = ref(false);
 const analyzing = ref(false);
 const chatInput = ref("");
+const listening = ref(false);
+const VoiceRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+let voice: any = null;
+function toggleVoice() {
+  if (listening.value) { voice?.stop(); return; }
+  if (!VoiceRecognition) { alert("This browser doesn't support voice input. You can paste or upload your dictated text."); return; }
+  voice = new VoiceRecognition();
+  voice.lang = "en-US";
+  voice.interimResults = false;
+  voice.onresult = (event: any) => {
+    const text = event.results[0][0].transcript;
+    if (session.value?.rawInput) chatInput.value += `${chatInput.value ? " " : ""}${text}`;
+    else { mode.value = "talk"; talkText.value += `${talkText.value ? " " : ""}${text}`; }
+    saveDraft();
+  };
+  voice.onend = () => { listening.value = false; };
+  voice.onerror = () => { listening.value = false; alert("Voice input couldn't start. Check microphone permission, or use Paste or Upload."); };
+  listening.value = true;
+  voice.start();
+}
+onUnmounted(() => { voice?.stop(); if (saveTimer) clearTimeout(saveTimer); saveDraft(); });
 
 // 3 intake modes
 const mode = ref<"talk" | "upload" | "paste">("talk");
@@ -37,11 +59,12 @@ const EXAMPLES: string[] = [
 ];
 
 // Draft autosave (localStorage). Debounced 2s + on blur + on mode change.
-const DRAFT_KEY = "crew.draft.newjob";
+let DRAFT_KEY = "";
 const draftSavedAt = ref<string | null>(null);
 let saveTimer: any = null;
 
 function saveDraft() {
+  if (!DRAFT_KEY) return;
   const payload = {
     mode: mode.value,
     talk: talkText.value,
@@ -51,8 +74,8 @@ function saveDraft() {
     specMarkdown: session.value?.specMarkdown ?? "",
     savedAt: new Date().toISOString(),
   };
-  localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
-  draftSavedAt.value = payload.savedAt;
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(payload)); draftSavedAt.value = payload.savedAt; }
+  catch { draftSavedAt.value = null; }
 }
 function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer);
@@ -77,6 +100,13 @@ function loadDraft(): boolean {
 onMounted(async () => {
   loading.value = true;
   try {
+    const project = await getProjectInfo();
+    DRAFT_KEY = `crew.draft.newjob:${project.path}`;
+    if (!localStorage.getItem("crew.draft.legacyProject")) {
+      const legacy = localStorage.getItem("crew.draft.newjob");
+      if (legacy) localStorage.setItem(DRAFT_KEY, legacy);
+      localStorage.setItem("crew.draft.legacyProject", project.path);
+    }
     session.value = await getDiscoverySession();
     const hasDraft = loadDraft();
     if (hasDraft && !session.value.rawInput && !session.value.specMarkdown?.startsWith("# Specification: New Feature")) {
@@ -172,13 +202,14 @@ async function doAnalyze() {
 }
 
 async function doChatSend() {
-  if (!chatInput.value.trim()) return;
+  if (!chatInput.value.trim() || analyzing.value) return;
+  analyzing.value = true;
   try {
     session.value = await sendChatMessage(chatInput.value);
     chatInput.value = "";
   } catch (e: any) {
     alert("That didn't work: " + e.message);
-  }
+  } finally { analyzing.value = false; }
 }
 
 async function doAnswerQuestion(q: DiscoveryQuestionItem, answer: string) {
@@ -215,11 +246,12 @@ async function doEditSpec(md: string) {
 }
 
 function continueToReview() {
+  if (!session.value?.ready) { alert("Let's finish the interview first. Your interviewer will summarize the brief when it's ready."); return; }
   saveDraft();
   go("review-approve", { specPath: undefined });
 }
 
-const hasSpec = computed(() => Boolean(session.value?.specMarkdown && session.value.specMarkdown.length > 80));
+const hasSpec = computed(() => Boolean(session.value?.ready));
 
 const openQuestionsLeft = computed(() => session.value?.analysis?.openQuestions?.filter(q => !q.answered).length ?? 0);
 
@@ -243,11 +275,23 @@ const fmtTime = (iso: string | null) => {
         </button>
       </template>
     </ScreenHeader>
+    <div class="section-card" style="margin-bottom: 14px">
+      <button class="btn btn-secondary" :disabled="!VoiceRecognition" @click="toggleVoice">{{ listening ? "Stop listening" : "Use microphone" }}</button>
+      <span class="dim"> {{ VoiceRecognition ? "Review your dictated words before sending. Your browser may use an external speech service." : "Voice input is unavailable in this browser; Paste and Upload remain available." }}</span>
+    </div>
 
-    <!-- Draft chip -->
-    <div v-if="draftSavedAt" class="draft-chip" aria-live="polite">
+    <!-- Draft chip. Kept in the layout even when empty: inserting it on blur
+         used to push the analyze button down between mousedown and mouseup,
+         swallowing the first click. -->
+    <div
+      class="draft-chip"
+      :class="{ empty: !draftSavedAt }"
+      :aria-hidden="!draftSavedAt"
+      aria-live="polite"
+    >
       <Save :size="12" />
-      Draft saved at {{ fmtTime(draftSavedAt) }}
+      <span v-if="draftSavedAt">Draft saved at {{ fmtTime(draftSavedAt) }}</span>
+      <span v-else>Draft not saved yet</span>
     </div>
 
     <!-- 3 intake mode cards -->
@@ -412,7 +456,7 @@ const fmtTime = (iso: string | null) => {
     </div>
 
     <!-- Editable spec -->
-    <div v-if="session" class="section-card" style="margin-top: 14px;">
+    <div v-if="session?.rawInput" class="section-card" style="margin-top: 14px;">
       <div class="section-label" style="display: flex; align-items: center; justify-content: space-between;">
         <span>Working spec — edit any section directly</span>
         <span class="dim" style="font-size: 11.5px; text-transform: none; font-weight: 400; letter-spacing: 0;">Auto-saves to draft. Editing after approval creates a new version.</span>
@@ -447,6 +491,7 @@ const fmtTime = (iso: string | null) => {
   padding: 2px 8px; border-radius: 10px;
   margin-bottom: 12px;
 }
+.draft-chip.empty { visibility: hidden; }
 .mode-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
 }

@@ -26,14 +26,15 @@
  * record it as skipped.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { chromium, type Browser, type Page } from "playwright";
 
-const TARGET_DIR = resolve("/tmp/crew-tour-test-target");
+const TARGET_DIR = mkdtempSync(join(tmpdir(), "crew-tour-"));
 const STUDIO_PORT = 4711;
-const PREVIEW_PORT = 4712;
+const PREVIEW_PORT = STUDIO_PORT;
 
 let serverProcess: ChildProcess | null = null;
 let previewProcess: ChildProcess | null = null;
@@ -64,7 +65,6 @@ async function waitUntilPreview(port: number, timeoutMs = 10000) {
 }
 
 beforeAll(async () => {
-  rmSync(TARGET_DIR, { recursive: true, force: true });
   mkdirSync(join(TARGET_DIR, "adws"), { recursive: true });
   mkdirSync(join(TARGET_DIR, "adws", "adw_sssf_config"), { recursive: true });
   mkdirSync(join(TARGET_DIR, "requests"), { recursive: true });
@@ -86,14 +86,9 @@ beforeAll(async () => {
   await waitUntilUp(STUDIO_PORT);
 
   // Boot vite dev server (HMR is fine; we just need a real DOM).
-  previewProcess = spawn("bunx", ["vite", "--port", String(PREVIEW_PORT), "--strictPort"], {
-    cwd: process.cwd(),
-    env: { ...process.env, STUDIO_PORT: String(STUDIO_PORT) },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
   await waitUntilPreview(PREVIEW_PORT);
 
-  browser = await chromium.launch();
+  browser = await chromium.launch({ channel: "msedge" });
 }, 120_000);
 
 afterAll(async () => {
@@ -154,7 +149,7 @@ async function startTour(page: Page) {
   await page.waitForSelector(".tour-bubble", { timeout: 5000 });
 }
 
-async function boxesOverlap(b1: DOMRect, b2: DOMRect, tol = 1): boolean {
+function boxesOverlap(b1: DOMRect, b2: DOMRect, tol = 1): boolean {
   return !(
     b1.right <= b2.left + tol ||
     b1.left >= b2.right - tol ||

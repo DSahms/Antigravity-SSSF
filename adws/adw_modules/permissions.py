@@ -32,6 +32,7 @@ Two keys drive it, both in sssf.config.yaml:
 from __future__ import annotations
 
 import re
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -42,29 +43,41 @@ class PermissionBreach(RuntimeError):
     """An agent modified a path it was not permitted to modify."""
 
 
+class TreeSnapshot(dict):
+    """Content plus fingerprints, so rollback preserves existing operator work."""
+
+    def __init__(self):
+        super().__init__()
+        self.contents = {}
+
+
 def _git(args: list[str], cwd) -> str:
-    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
-    return result.stdout if result.returncode == 0 else ""
+    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8")
+    if result.returncode != 0:
+        raise RuntimeError("Git could not inspect the working tree; permission checking cannot proceed.")
+    return result.stdout
 
 
 def snapshot(run) -> dict[str, str]:
-    """Fingerprint every path the working tree currently differs on.
-
-    Tracked files carry their numstat counts, so an edit to an already-dirty
-    file still registers as a change. Untracked files are listed by name.
-    Gitignored paths never appear, which is why the session runtime under
-    `data_dir` — where handoff files legitimately land — needs no special case.
-    """
-    fingerprints: dict[str, str] = {}
-    for line in _git(["diff", "HEAD", "--numstat"], run.repo_root).splitlines():
-        fields = line.split("\t")
-        if len(fields) >= 3:
-            path = fields[-1].strip()
-            fingerprints[path] = f"{fields[0]},{fields[1]}"
-    for path in _git(["ls-files", "--others", "--exclude-standard"],
-                     run.repo_root).splitlines():
-        if path.strip():
-            fingerprints[path.strip()] = "untracked"
+    """Hash and preserve tracked and untracked file contents; ignored runtime is excluded."""
+    fingerprints = TreeSnapshot()
+    paths = _git(["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                 run.repo_root).split("\0")
+    for path in paths:
+        if not path:
+            continue
+        file = Path(run.repo_root) / path
+        if not file.resolve().is_relative_to(Path(run.repo_root).resolve()):
+            fingerprints[path] = "outside-root"
+            continue
+        if file.is_symlink():
+            fingerprints[path] = "symlink:" + str(file.readlink())
+        elif file.is_file():
+            content = file.read_bytes()
+            fingerprints.contents[path] = content
+            fingerprints[path] = hashlib.sha256(content).hexdigest()
+        else:
+            fingerprints[path] = "missing"
     return fingerprints
 
 
@@ -143,13 +156,29 @@ def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str]) ->
     uncommitted work there, and discarding it to tidy up would be the same harm
     this module exists to prevent, committed by the cleanup instead of the agent.
     """
+    if isinstance(before, TreeSnapshot):
+        file = Path(run.repo_root) / path
+        try:
+            if not file.resolve().is_relative_to(Path(run.repo_root).resolve()):
+                return "path escaped the repository; manual recovery required"
+            if file.is_symlink() or str(before.get(path, "")).startswith("symlink:"):
+                return "symlink change requires manual recovery"
+            if path in before.contents:
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_bytes(before.contents[path])
+                return "restored pre-agent content"
+            if file.is_file():
+                file.unlink()
+            return "removed introduced file"
+        except OSError as error:
+            return f"could not restore ({error})"
     if path in before:
         # Already dirty beforehand. If it is gone from the diff now, the agent
         # reverted an engineer's uncommitted work and the content is not ours
         # to reconstruct — say so loudly rather than pretend it was handled.
         return "REVERTED-BY-AGENT (uncommitted work lost, cannot restore)" \
             if path not in after else "left as-is (was already modified)"
-    if after.get(path) == "untracked":
+    if path not in before:
         try:
             (Path(run.repo_root) / path).unlink()
             return "deleted"
@@ -172,7 +201,7 @@ def enforce(run, phase, agent: AgentConfig, before: dict[str, str]) -> list[str]
     """
     after = snapshot(run)
     touched = changed_paths(before, after)
-    breaches = [p for p in touched if not permitted(p, agent, run.cfg)]
+    breaches = [p for p in touched if after.get(p) == "outside-root" or not permitted(p, agent, run.cfg)]
     if not breaches:
         return touched
 

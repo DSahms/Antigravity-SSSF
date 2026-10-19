@@ -726,6 +726,8 @@ input[type="checkbox"], input[type="radio"] {
 }
 
 /* Tour: respect reduced motion */
+button, select, input:not([type="checkbox"]), .btn { min-height: 40px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }

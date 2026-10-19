@@ -22,6 +22,9 @@ import type {
   LaunchRequest,
   LiveRunState,
   NamedRosterPreset,
+  ProjectDeliverables,
+  ProjectQualityState,
+  QualityConfig,
   SessionDetail,
   SessionSummary,
   SssfConfig,
@@ -50,6 +53,15 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
 // ── Studio: Project & Stamping ──────────────────────────────────────────────
 
 export const getProjectInfo = () => req<TargetProject>("/api/studio/project");
+export const createProject = (name: string) => req<TargetProject>("/api/studio/project/create", { method: "POST", body: JSON.stringify({ name }) });
+
+export const getProjectDeliverables = () => req<ProjectDeliverables>("/api/studio/project/deliverables");
+export const getProjectQuality = () => req<ProjectQualityState>("/api/studio/project/quality");
+export const saveProjectQuality = (config: QualityConfig) =>
+  req<ProjectQualityState>("/api/studio/project/quality", {
+    method: "POST",
+    body: JSON.stringify(config),
+  });
 
 export const setTargetDir = (path: string) =>
   req<TargetProject>("/api/studio/project/select", {
@@ -225,16 +237,17 @@ export const setDefaultTokenCap = (cap: number) =>
     body: JSON.stringify({ defaultTokenCap: cap }),
   });
 
-export const fetchModels = (baseUrl: string, apiKey: string) =>
+export const fetchModels = (baseUrl: string, apiKey: string, profile?: { role: string; provider: string }) =>
   req<FetchModelsResponse>("/api/studio/profiles/fetch-models", {
     method: "POST",
-    body: JSON.stringify({ baseUrl, apiKey }),
+    body: JSON.stringify({ baseUrl, apiKey, ...profile }),
   });
+export const applyConnectionToAll = (role: string, provider: string) => req<ConnectionProfileStore>("/api/studio/profiles/apply-all", { method: "POST", body: JSON.stringify({ role, provider }) });
 
-export const testConnection = (baseUrl: string, model: string, apiKey: string) =>
+export const testConnection = (baseUrl: string, model: string, apiKey: string, profile?: { role: string; provider: string }) =>
   req<TestConnectionResponse>("/api/studio/profiles/test", {
     method: "POST",
-    body: JSON.stringify({ baseUrl, model, apiKey }),
+    body: JSON.stringify({ baseUrl, model, apiKey, ...profile }),
   });
 
 // ── Visualizer Observability Methods ────────────────────────────────────────

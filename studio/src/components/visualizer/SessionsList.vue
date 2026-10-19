@@ -5,6 +5,8 @@ import { fetchSessions } from '@/lib/api'
 import { ts } from '@/lib/format'
 import SessionCard from './SessionCard.vue'
 
+const emit = defineEmits<{ select: [adwId: string] }>()
+
 const sessions = shallowRef<SessionSummary[]>([])
 const apiError = ref<string | null>(null)
 const loaded = ref(false)
@@ -62,6 +64,7 @@ const ordered = computed(() =>
         :session="s"
         :now-ms="nowMs"
         @archived="onArchived"
+        @select="emit('select', $event)"
       />
     </div>
     <div v-else-if="loaded" class="empty-state">no sessions yet — run an ADW to see it here</div>

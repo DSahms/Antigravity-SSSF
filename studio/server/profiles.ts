@@ -53,6 +53,7 @@ export class ProfileStore {
   }
 
   private load() {
+    this.state = null;
     try {
       if (existsSync(this.file)) {
         const raw = readFileSync(this.file, "utf-8");
@@ -107,9 +108,9 @@ export class ProfileStore {
     const hasKey = Boolean(readVeniceKey(this.dir));
     for (const p of this.state.profiles) {
       if (p.provider === "cloud") {
-        p.disabled = !hasKey;
+        p.disabled = !hasKey && !p.apiKey;
         // Inject the key into the in-memory copy if present
-        if (hasKey) p.apiKey = readVeniceKey(this.dir) ?? "";
+        if (hasKey && p.baseUrl.startsWith("https://api.venice.ai/") && !p.apiKey) p.apiKey = readVeniceKey(this.dir) ?? "";
       }
     }
   }
@@ -119,23 +120,53 @@ export class ProfileStore {
     return this.state!;
   }
 
+  publicList(): ConnectionProfileStore {
+    const state = this.list();
+    return { ...state, profiles: state.profiles.map(p => ({ ...p, apiKey: p.apiKey && p.apiKey !== "none" ? "••••••••" : p.apiKey })) };
+  }
+
+  applyToAll(role: string, provider: string): ConnectionProfileStore {
+    const source = this.list().profiles.find(p => p.role === role && p.provider === provider);
+    if (!source || source.disabled) throw new Error("Save a working connection before applying it to other roles.");
+    for (const profile of this.state!.profiles) {
+      if (profile.provider !== source.provider) continue;
+      Object.assign(profile, { baseUrl: source.baseUrl, model: source.model, apiKey: source.apiKey, reasoningLevel: source.reasoningLevel, hideThinking: source.hideThinking, disabled: source.disabled });
+      this.state!.selectedProviders ??= {};
+      this.state!.selectedProviders[profile.role] = source.provider;
+    }
+    this.persist();
+    return this.publicList();
+  }
+
+  connectionKey(input: { role?: string; provider?: string; apiKey: string }): string {
+    if (input.apiKey && !input.apiKey.startsWith("••••")) return input.apiKey.trim();
+    const saved = this.list().profiles.find(p => p.role === input.role && p.provider === input.provider);
+    return saved?.apiKey || "";
+  }
+
   upsert(profile: ConnectionProfile): ConnectionProfileStore {
+    if (!profile || !KNOWN_ROLES.some(r => r.role === profile.role) || !["local", "cloud"].includes(profile.provider)) throw new Error("Choose a supported role and connection variant.");
+    const url = new URL(profile.baseUrl);
+    if (!["http:", "https:"].includes(url.protocol) || !profile.model?.trim()) throw new Error("Use an HTTP endpoint and choose a model.");
     if (!this.state) this.state = this.seedDefaults();
     const idx = this.state.profiles.findIndex(
       (p) => p.role === profile.role && p.provider === profile.provider,
     );
     if (idx >= 0) this.state.profiles[idx] = { ...profile, apiKey: maskOrKeep(profile.apiKey, this.state.profiles[idx].apiKey) };
     else this.state.profiles.push(profile);
+    this.state.selectedProviders ??= {};
+    this.state.selectedProviders[profile.role] = profile.provider;
     this.syncCloudDisabled();
     this.persist();
-    return this.state;
+    return this.publicList();
   }
 
   setDefaultTokenCap(cap: number) {
+    if (!Number.isSafeInteger(cap) || cap <= 0) throw new Error("Choose a positive whole-number token cap.");
     if (!this.state) this.state = this.seedDefaults();
     this.state.defaultTokenCap = Math.max(0, Math.floor(cap));
     this.persist();
-    return this.state;
+    return this.publicList();
   }
 
   /** Fetch models from `${baseUrl}/models` (OpenAI-compatible). */

@@ -10,7 +10,15 @@ import StatChip from './StatChip.vue'
 import PhaseDots from './PhaseDots.vue'
 
 const props = defineProps<{ session: SessionSummary; nowMs: number }>()
-const emit = defineEmits<{ archived: [adwId: string] }>()
+const emit = defineEmits<{ archived: [adwId: string]; select: [adwId: string] }>()
+
+// The card is an anchor so it still supports middle-click and copy-link, but a
+// normal click selects through the parent instead of relying on hashchange.
+function select(event: MouseEvent) {
+  if ((event.target as HTMLElement).closest('.card-archive')) return
+  event.preventDefault()
+  emit('select', props.session.adw_id)
+}
 
 // The card is an <a>; the button lives inside it, so the click must not
 // navigate. Told the parent optimistically — the poll would take up to half a
@@ -187,7 +195,7 @@ const hiddenRowCount = computed(() =>
 </script>
 
 <template>
-  <a class="card" :class="session.status" :href="hrefFor(session.adw_id)">
+  <a class="card" :class="session.status" :href="hrefFor(session.adw_id)" @click="select">
     <button
       class="card-archive"
       type="button"

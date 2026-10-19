@@ -7,6 +7,8 @@
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { Database } from "bun:sqlite";
 import type {
   AdwWorkflowInfo,
   ApprovalRecordV2,
@@ -14,6 +16,15 @@ import type {
   LiveRunState,
 } from "../shared/types.ts";
 import { ApprovalBook } from "./approvals.ts";
+import { ProfileStore } from "./profiles.ts";
+import { prepareRuntime } from "./runtime.ts";
+
+const QUALITY_WORKFLOWS = new Set([
+  "adw_simple_sdlc.py",
+  "adw_plan_build_test.py",
+  "adw_build_test.py",
+  "adw_quality.py",
+]);
 
 const WORKFLOW_METADATA: Record<
   string,
@@ -27,12 +38,12 @@ const WORKFLOW_METADATA: Record<
   }
 > = {
   "adw_simple_sdlc.py": {
-    name: "Simple SDLC (Full Chain)",
+    name: "Build, Check, Review & Document",
     description: "The complete pipeline: plan → build → test → review → document, landing 3 agent commits.",
     phases: ["request", "plan", "commit_plan", "build", "test", "review", "document", "commit_docs"],
     requiredAgents: ["planner", "builder", "reviewer", "documenter"],
-    recommendedWhen: "When building real features from an approved specification.",
-    badge: "Recommended",
+    recommendedWhen: "When building real features from an approved specification. Expect a long, token-heavy run.",
+    badge: "Full build",
   },
   "adw_plan_build_test.py": {
     name: "Plan, Build & Test",
@@ -65,10 +76,11 @@ const WORKFLOW_METADATA: Record<
   },
   "adw_plan.py": {
     name: "Plan Only",
-    description: "Generates an architectural plan in specs/plan.md without modifying any repository files.",
+    description: "Writes a plan under specs without building the app.",
     phases: ["request", "plan"],
     requiredAgents: ["planner"],
-    recommendedWhen: "Architecture exploration and blueprint design.",
+    recommendedWhen: "First run: verify the interview, approval, trace, and deliverables without a long build.",
+    badge: "Recommended",
   },
   "adw_scout.py": {
     name: "Scout Recon",
@@ -110,10 +122,31 @@ export class WorkflowLauncher {
   constructor(targetDir: string, book: ApprovalBook) {
     this.targetDir = targetDir;
     this.book = book;
+    this.loadHistory();
   }
 
   setTargetDir(dir: string): void {
+    if (Array.from(this.activeRuns.values()).some(r => r.status === "running" || r.status === "paused")) {
+      throw new Error("Stop the current job before switching projects.");
+    }
+    this.activeRuns.clear();
     this.targetDir = dir;
+    this.loadHistory();
+  }
+
+  private loadHistory(): void {
+    try {
+      const history = JSON.parse(readFileSync(join(this.targetDir, "adws/adw_data/studio_history.json"), "utf8"));
+      for (const saved of history.runs ?? []) {
+        if (!["success", "fail", "stopped"].includes(saved.status) || this.activeRuns.has(saved.runId)) continue;
+        this.activeRuns.set(saved.runId, {
+          ...saved,
+          workflowName: WORKFLOW_METADATA[saved.workflowId]?.name ?? saved.workflowId,
+          // Keep a bounded tail so Results/Run still have context after a restart.
+          logs: Array.isArray(saved.logs) ? saved.logs.slice(-400) : [],
+        });
+      }
+    } catch {}
   }
 
   setApprovalBook(book: ApprovalBook) {
@@ -152,7 +185,7 @@ export class WorkflowLauncher {
   }
 
   getActiveRuns(): LiveRunState[] {
-    return Array.from(this.activeRuns.values());
+    return Array.from(this.activeRuns.values()).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }
 
   getRunState(runId: string): LiveRunState | null {
@@ -160,32 +193,47 @@ export class WorkflowLauncher {
   }
 
   async launchWorkflow(req: LaunchRequest & { approvalId?: string; tokenCap?: number }): Promise<LiveRunState> {
+    if (!this.listWorkflows().some(w => w.id === req.workflowId)) throw new Error("Choose an available workflow.");
+    if (req.configPath && req.configPath !== "adws/adw_sssf_config/sssf.config.yaml") throw new Error("Use the roster that was reviewed and approved.");
+    if (req.adwId && !/^[a-f0-9]{8}$/.test(req.adwId)) throw new Error("Invalid session ID.");
+    if (Array.from(this.activeRuns.values()).some(r => r.status === "running" || r.status === "paused")) throw new Error("A job is already running in this project.");
     // ── Hard gate: server-side approval enforcement ────────────────────
     if (!req.approvalId) {
       throw new Error("Approval required: no run can start without a recorded approval.");
     }
     const approval: ApprovalRecordV2 = this.book.assertApproved(req.approvalId, req.workflowId);
+    if (QUALITY_WORKFLOWS.has(req.workflowId) && !existsSync(join(this.targetDir, ".crew-quality.json"))) {
+      throw new Error("This workflow runs deterministic checks, but this project has no .crew-quality.json. Open Settings → Project checks, add the real test/lint/typecheck/build commands, then run again.");
+    }
+    const gitStatus = Bun.spawnSync(["git", "status", "--porcelain"], { cwd: this.targetDir });
+    if (gitStatus.exitCode !== 0) throw new Error("Choose a prepared app project with Git history.");
+    if (req.workflowId !== "adw_scout.py" && req.workflowId !== "adw_quality.py" && gitStatus.stdout.toString().trim()) throw new Error("This project has uncommitted work. Review and save it before starting agents, or create a separate app project.");
     // ───────────────────────────────────────────────────────────────────
 
     const scriptPath = join("adws", req.workflowId);
-    const promptArg = approval.specMarkdown.slice(0, 4000)
-      ? `requests/.crew-runtime-${Date.now()}.md` // see below — we materialize the spec
-      : "Implement requested specification";
-
     // Materialize the approved spec as a runtime file in requests/ so the
     // Python factory reads the exact approved text. (Approved-spec mode
     // already points at a file; for the approval-gated path we always use
     // the approved text the user signed off on.)
     const runtimeSpecPath = await this.materializeApprovedSpec(approval);
 
-    const runId = "run-" + Date.now().toString(36);
+    const runId = "run-" + randomUUID();
+    const runTarget = this.targetDir;
     const configPath = req.configPath || "adws/adw_sssf_config/sssf.config.yaml";
     const meta = WORKFLOW_METADATA[req.workflowId] || { name: req.workflowId };
-    const tokenCap = req.tokenCap && req.tokenCap > 0 ? req.tokenCap : 20_000;
+    const tokenCap = req.tokenCap ?? new ProfileStore(this.targetDir).list().defaultTokenCap;
+    if (!Number.isSafeInteger(tokenCap) || tokenCap <= 0) throw new Error("Set a positive whole-number token cap before running.");
+    const runtime = prepareRuntime(this.targetDir, runId, new ProfileStore(this.targetDir).list(), configPath);
+    const runtimeConfig = new (await import("./config.ts")).ConfigManager(this.targetDir).loadConfig().config;
+    const required = WORKFLOW_METADATA[req.workflowId]?.requiredAgents ?? [];
+    if (req.workflowId !== "adw_prompt.py") {
+      const missing = required.filter(name => !runtimeConfig.agents.some(a => a.name === name));
+      if (missing.length) throw new Error(`This workflow requires these roster roles: ${missing.join(", ")}. Choose a compatible workflow or roster.`);
+    }
 
     const liveRun: LiveRunState = {
       runId,
-      adwId: req.adwId || "",
+      adwId: req.adwId || randomUUID().replaceAll("-", "").slice(0, 8),
       workflowId: req.workflowId,
       workflowName: meta.name,
       status: "running",
@@ -207,8 +255,8 @@ export class WorkflowLauncher {
 
     this.activeRuns.set(runId, liveRun);
 
-    const args = ["uv", "run", scriptPath, "--config", configPath];
-    if (req.adwId) args.push("--adw-id", req.adwId);
+    const args = ["uv", "run", scriptPath, "--config", runtime.configPath];
+    args.push("--adw-id", liveRun.adwId);
     args.push(runtimeSpecPath);
 
     try {
@@ -218,9 +266,11 @@ export class WorkflowLauncher {
           ...process.env,
           PYTHONIOENCODING: "utf-8",
           PYTHONUTF8: "1",
+          ...runtime.env,
         },
         stdout: "pipe",
         stderr: "pipe",
+        detached: process.platform !== "win32",
       });
 
       liveRun.pid = proc.pid;
@@ -228,10 +278,27 @@ export class WorkflowLauncher {
 
       this.streamOutput(runId, proc.stdout, false);
       this.streamOutput(runId, proc.stderr, true);
+      const dbPath = join(runTarget, "adws", "adw_data", "sssf.db");
+      const usageTimer = setInterval(() => {
+        if (!existsSync(dbPath) || liveRun.status === "stopped") return;
+        const total = this.readTokenUsage(dbPath, liveRun.adwId);
+        if (total != null) {
+          liveRun.tokenUsage = Math.max(liveRun.tokenUsage ?? 0, total);
+          this.checkTokenCap(runId, liveRun);
+        }
+      }, 500);
 
       proc.exited.then((code) => {
+        clearInterval(usageTimer);
+        // The last usage event can land after the final stdout line, so read the
+        // trace once more before recording the result.
+        const total = this.readTokenUsage(dbPath, liveRun.adwId);
+        if (total != null) liveRun.tokenUsage = Math.max(liveRun.tokenUsage ?? 0, total);
         liveRun.exitCode = code;
-        liveRun.status = code === 0 ? "success" : "fail";
+        if (liveRun.status !== "stopped") liveRun.status = code === 0 ? "success" : "fail";
+        if (liveRun.status === "fail" && (liveRun.tokenCap ?? 0) > 0 && (liveRun.tokenUsage ?? 0) >= (liveRun.tokenCap ?? 0)) {
+          liveRun.stopReason = "token-cap";
+        }
         liveRun.endedAt = new Date().toISOString();
         const finishMsg = `[crew] Workflow finished with exit code ${code} (${liveRun.status})`;
         liveRun.logs.push(finishMsg);
@@ -246,12 +313,13 @@ export class WorkflowLauncher {
       liveRun.endedAt = new Date().toISOString();
       const errMsg = `[crew] Failed to spawn process: ${err.message}`;
       liveRun.logs.push(errMsg);
+      this.saveRunHistory(liveRun);
       return liveRun;
     }
   }
 
   private async materializeApprovedSpec(approval: ApprovalRecordV2): Promise<string> {
-    const requestsDir = join(this.targetDir, "requests");
+    const requestsDir = join(this.targetDir, ".sssf", "approved-specs");
     if (!existsSync(requestsDir)) {
       const { mkdirSync } = await import("node:fs");
       mkdirSync(requestsDir, { recursive: true });
@@ -302,9 +370,9 @@ export class WorkflowLauncher {
 
             // Parse tokens (cumulative) — matches SSSF's usage lines like
             // "tokens: 1234" or "total_tokens: 1234" or "usage.total_tokens: 1234"
-            const tokMatch = line.match(/(?:total_tokens|tokens|total)\s*[:=]\s*(\d+)/i);
+            const tokMatch = line.match(/(?:total_tokens|tokens|total)\s*[:=]\s*([\d,]+)/i);
             if (tokMatch && tokMatch[1]) {
-              const n = parseInt(tokMatch[1], 10);
+              const n = parseInt(tokMatch[1].replaceAll(",", ""), 10);
               if (Number.isFinite(n) && n > (liveRun.tokenUsage ?? 0)) {
                 liveRun.tokenUsage = n;
                 this.checkTokenCap(runId, liveRun);
@@ -327,6 +395,20 @@ export class WorkflowLauncher {
     } catch {}
   }
 
+  private readTokenUsage(dbPath: string, adwId: string): number | null {
+    if (!existsSync(dbPath)) return null;
+    let db: Database | undefined;
+    try {
+      db = new Database(dbPath, { readonly: true });
+      const row = db.query("SELECT COALESCE(SUM(tokens), 0) AS total_tokens FROM events WHERE adw_id = ? AND type = 'usage'").get(adwId) as { total_tokens: number } | null;
+      return row?.total_tokens ?? null;
+    } catch {
+      return null;
+    } finally {
+      db?.close();
+    }
+  }
+
   private checkTokenCap(runId: string, liveRun: LiveRunState) {
     const cap = liveRun.tokenCap ?? 0;
     if (cap <= 0) return;
@@ -345,8 +427,13 @@ export class WorkflowLauncher {
 
     if (proc) {
       try {
-        proc.kill();
-      } catch {}
+        if (process.platform === "win32") {
+          const result = Bun.spawnSync(["taskkill", "/PID", String(proc.pid), "/T", "/F"]);
+          if (result.exitCode !== 0) throw new Error("Could not stop the job process tree. Try Stop again.");
+        } else {
+          process.kill(-proc.pid, "SIGKILL");
+        }
+      } catch (error) { throw error; }
       this.childProcesses.delete(runId);
     }
 
@@ -354,6 +441,20 @@ export class WorkflowLauncher {
       liveRun.status = "stopped";
       liveRun.stopReason = reason;
       liveRun.endedAt = new Date().toISOString();
+      const tracePath = join(this.targetDir, "adws", "adw_data", "sssf.db");
+      if (existsSync(tracePath)) {
+        let db: Database | undefined;
+        try {
+          db = new Database(tracePath);
+          db.exec("PRAGMA busy_timeout=5000");
+          db.transaction(() => {
+            db!.query("UPDATE sessions SET status='fail', ended_at=?, total_tokens=MAX(COALESCE(total_tokens,0),?) WHERE adw_id=?").run(liveRun.endedAt!, liveRun.tokenUsage ?? 0, liveRun.adwId);
+            db!.query("UPDATE phases SET status='fail', ended_at=?, error='Run stopped' WHERE adw_id=? AND ended_at IS NULL").run(liveRun.endedAt!, liveRun.adwId);
+            db!.query("UPDATE processes SET ended_at=? WHERE adw_id=? AND ended_at IS NULL").run(liveRun.endedAt!, liveRun.adwId);
+          })();
+        } catch { liveRun.logs.push("[crew] The job stopped, but its trace could not be finalized."); }
+        finally { db?.close(); }
+      }
       const msg = reason === "token-cap"
         ? `[crew] Stopped at the token cap. The job did not finish. Raise the cap in Settings or approve a smaller spec and try again.`
         : `[crew] Process stopped by user.`;
@@ -375,11 +476,12 @@ export class WorkflowLauncher {
     const liveRun = this.activeRuns.get(runId);
     const proc = this.childProcesses.get(runId);
     if (!liveRun || liveRun.status !== "running") return false;
+    if (process.platform === "win32") throw new Error("Pause is not available on Windows yet. The job is still running; use Stop to end it.");
 
     try {
-      if (process.platform !== "win32" && typeof proc?.kill === "function") {
+      if (typeof proc?.kill === "function") {
         // SIGTSTP = suspend
-        (proc as any).kill?.("SIGTSTP");
+        process.kill(-proc.pid, "SIGSTOP");
       }
       liveRun.status = "paused";
       const msg = `[crew] Run paused. Resume to continue, or Stop to end.`;
@@ -400,7 +502,7 @@ export class WorkflowLauncher {
     if (!liveRun || liveRun.status !== "paused") return false;
     try {
       if (process.platform !== "win32" && typeof proc?.kill === "function") {
-        (proc as any).kill?.("SIGCONT");
+        process.kill(-proc.pid, "SIGCONT");
       }
       liveRun.status = "running";
       liveRun.stopReason = "user-pause-resumed";
@@ -443,6 +545,7 @@ export class WorkflowLauncher {
         try { history = JSON.parse(readFileSync(historyFile, "utf-8")); } catch {}
       }
       if (!Array.isArray(history.runs)) history.runs = [];
+      history.runs = history.runs.filter(r => r.runId !== run.runId);
       history.runs.unshift({
         runId: run.runId,
         adwId: run.adwId,
@@ -456,6 +559,7 @@ export class WorkflowLauncher {
         tokenUsage: run.tokenUsage,
         tokenCap: run.tokenCap,
         stopReason: run.stopReason,
+        logs: run.logs.slice(-400),
       });
       writeFileSync(historyFile, JSON.stringify(history, null, 2), "utf-8");
     } catch (e) {

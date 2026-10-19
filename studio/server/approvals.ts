@@ -12,7 +12,7 @@
  * mission prompt states must be enforced server-side, not just in the UI.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import type {
   ApprovalBookSummary,
@@ -38,6 +38,7 @@ export class ApprovalBook {
   }
 
   private load() {
+    this.records = [];
     try {
       if (existsSync(this.file)) {
         const raw = readFileSync(this.file, "utf-8");
@@ -57,6 +58,17 @@ export class ApprovalBook {
 
   static hashSpec(markdown: string): string {
     return createHash("sha256").update(markdown).digest("hex").slice(0, 16);
+  }
+
+  private executionHash(): string {
+    const target = dirname(this.dir);
+    const hash = createHash("sha256");
+    for (const relative of ["adws/adw_sssf_config/sssf.config.yaml", ".sssf/profiles.json"]) {
+      const path = join(target, relative);
+      hash.update(relative);
+      hash.update(existsSync(path) ? readFileSync(path) : "missing");
+    }
+    return hash.digest("hex");
   }
 
   list(): ApprovalBookSummary[] {
@@ -110,6 +122,7 @@ export class ApprovalBook {
     const version = this.latestVersionForTitle(input.specTitle) + 1;
 
     const record: ApprovalRecordV2 = {
+      executionHash: this.executionHash(),
       id: "appr-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       specVersion: version,
       specHash: hash,
@@ -175,6 +188,7 @@ export class ApprovalBook {
         `Approval authorizes workflow "${r.workflowName}", not "${workflowId}". Re-approve for this workflow.`,
       );
     }
+    if (r.executionHash !== this.executionHash()) throw new Error("Connection or roster settings changed after approval. Review and approve the job again.");
     // All sections must be confirmed.
     const unconfirmed = r.sections.filter((s) => !s.confirmed);
     if (unconfirmed.length > 0) {

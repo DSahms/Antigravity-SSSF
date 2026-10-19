@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from "node:url";
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    exclude: ["test/**/*.bun.test.ts"],
     testTimeout: 120_000,
     hookTimeout: 120_000,
     // The approval test is pure Node and uses Bun's fetch; the tour test

@@ -325,6 +325,7 @@ export class ConfigManager {
 
     const configPath = this.getConfigPath();
     const yamlString = stringify(config, {
+      defaultStringType: "QUOTE_DOUBLE",
       indent: 2,
       lineWidth: 120,
     });
@@ -359,7 +360,7 @@ export class ConfigManager {
 
     const seen = new Set<string>();
     for (const a of config.agents) {
-      if (!a.name || seen.has(a.name)) {
+      if (!/^[a-z][a-z0-9_-]{0,63}$/.test(a.name) || seen.has(a.name)) {
         throw new Error(`Duplicate or empty agent name: "${a.name}"`);
       }
       seen.add(a.name);
@@ -414,9 +415,14 @@ export class ConfigManager {
     }
 
     const safeName = name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
+    if (!safeName) throw new Error("Give the roster a name.");
+    const snapshotDir = join(this.targetDir, ".sssf", "rosters");
+    mkdirSync(snapshotDir, { recursive: true });
+    const profileFile = join(this.targetDir, ".sssf", "profiles.json");
+    if (existsSync(profileFile)) writeFileSync(join(snapshotDir, `${safeName}.json`), readFileSync(profileFile));
     const filePath = join(rostersDir, `${safeName}.yaml`);
 
-    const yamlString = stringify(config, { indent: 2, lineWidth: 120 });
+    const yamlString = stringify(config, { indent: 2, lineWidth: 120, defaultStringType: "QUOTE_DOUBLE" });
     writeFileSync(filePath, `# SSSF Custom Roster Preset: ${name}\n` + yamlString, "utf-8");
     return true;
   }
@@ -430,6 +436,11 @@ export class ConfigManager {
     }
 
     this.saveConfig(matched.config);
+    if (matched.tag === "custom") {
+      const safeName = matched.name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
+      const snapshot = join(this.targetDir, ".sssf", "rosters", `${safeName}.json`);
+      if (existsSync(snapshot)) writeFileSync(join(this.targetDir, ".sssf", "profiles.json"), readFileSync(snapshot));
+    }
     return matched.config;
   }
 
@@ -474,6 +485,7 @@ export class ConfigManager {
   }
 
   setEnvKey(key: string, value: string): boolean {
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(key) || /[\r\n]/.test(value)) throw new Error("Use a valid setting name and a single-line value.");
     const envPath = join(this.targetDir, ".env");
     let content = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
 

@@ -78,6 +78,9 @@ def verdict_consistent(envelope: EnvelopeBase, run) -> GateReport:
     """
     report = GateReport()
     approved = bool(getattr(envelope, "approved", False))
+    findings = list(getattr(envelope, "findings", []))
+    report.check("review has evidence", bool(findings) and all(f.requirement.strip() and f.evidence.strip() for f in findings),
+                 "requirements have supporting evidence" if findings else "review contains no requirement findings")
     blocking = list(getattr(envelope, "blocking", []))
     unmet = [f.requirement for f in getattr(envelope, "findings", []) if not f.met]
 

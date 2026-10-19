@@ -1,24 +1,27 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import {
-  ArrowRight, CheckCircle2, Clock, ExternalLink, ListChecks,
-  PlayCircle, RotateCcw, XCircle, Zap,
+  ArrowRight, CheckCircle2, Clock, Copy, ExternalLink, FileText, FolderOpen,
+  ListChecks, PlayCircle, RotateCcw, XCircle, Zap,
 } from "lucide-vue-next";
 import ScreenHeader from "@/components/ScreenHeader.vue";
 import {
-  fetchSession, getActiveRuns, getApproval, getRunState,
-  getWorkflows,
+  fetchSession, getActiveRuns, getApproval, getProjectDeliverables,
+  getRunState, getWorkflows,
 } from "@/lib/api";
 import { fmtCost, fmtDuration, fmtTokens, ts } from "@/lib/format";
 import { go, nav } from "@/lib/nav";
 import type {
-  AdwWorkflowInfo, ApprovalRecordV2, LiveRunState, SessionDetail,
+  AdwWorkflowInfo, ApprovalRecordV2, LiveRunState, ProjectDeliverables,
+  SessionDetail,
 } from "@shared/types.ts";
 
 const run = ref<LiveRunState | null>(null);
 const session = ref<SessionDetail | null>(null);
 const approval = ref<ApprovalRecordV2 | null>(null);
 const workflows = ref<AdwWorkflowInfo[]>([]);
+const deliverables = ref<ProjectDeliverables | null>(null);
+const copiedPath = ref(false);
 const loading = ref(false);
 
 onMounted(async () => {
@@ -39,8 +42,22 @@ onMounted(async () => {
     if (run.value?.adwId) {
       try { session.value = await fetchSession(run.value.adwId); } catch {}
     }
+    try { deliverables.value = await getProjectDeliverables(); } catch {}
   } finally { loading.value = false; }
 });
+
+const fmtBytes = (bytes: number): string =>
+  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` :
+  bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`;
+
+async function copyProjectPath() {
+  if (!deliverables.value) return;
+  try {
+    await navigator.clipboard.writeText(deliverables.value.projectPath);
+    copiedPath.value = true;
+    setTimeout(() => { copiedPath.value = false; }, 2000);
+  } catch { /* the path is visible and selectable if the clipboard is blocked */ }
+}
 
 const runMs = computed(() => {
   if (!run.value?.endedAt) return NaN;
@@ -112,7 +129,8 @@ const totalGates = computed(() => session.value?.gate_results?.length ?? 0);
         </div>
         <div class="stat-card">
           <div class="stat-label">Cost</div>
-          <div class="stat-value">{{ fmtCost(session?.session?.total_cost ?? null) }}</div>
+          <div class="stat-value">Check router</div>
+          <div class="dim">Router billing is not supplied to Crew.</div>
         </div>
       </div>
 
@@ -137,6 +155,40 @@ const totalGates = computed(() => session.value?.gate_results?.length ?? 0);
             <span class="badge" :class="p.status === 'success' ? 'badge-green' : p.status === 'fail' ? 'badge-red' : p.status === 'running' ? 'badge-amber' : ''">{{ p.status }}</span>
             <span class="dim" style="font-size: 12px;">{{ p.owner }}</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Deliverables -->
+      <div v-if="deliverables" class="section-card" style="margin-top: 14px;">
+        <div class="section-label">Deliverables</div>
+        <div class="deliverable-path">
+          <FolderOpen :size="16" />
+          <span class="mono">{{ deliverables.projectPath }}</span>
+          <button class="btn btn-ghost btn-xs" @click="copyProjectPath">
+            <Copy :size="12" /> {{ copiedPath ? "Copied" : "Copy path" }}
+          </button>
+        </div>
+
+        <div v-if="deliverables.specs.length" class="deliverable-list">
+          <div v-for="file in deliverables.specs" :key="file.path" class="deliverable-file">
+            <FileText :size="14" />
+            <span class="deliverable-name">{{ file.name }}</span>
+            <span class="dim">{{ fmtBytes(file.sizeBytes) }}</span>
+            <span class="dim mono deliverable-full" :title="file.path">{{ file.path }}</span>
+          </div>
+        </div>
+        <div v-else class="dim" style="font-size: 13px; margin-top: 8px;">
+          No plan or approved specification files yet. Run Plan Only or approve a job to create one.
+        </div>
+
+        <div v-if="deliverables.changedFiles.length" style="margin-top: 10px;">
+          <div class="section-label" style="margin-bottom: 4px;">Changed files</div>
+          <div class="changed-list mono">
+            <div v-for="file in deliverables.changedFiles" :key="file">{{ file }}</div>
+          </div>
+        </div>
+        <div class="dim" style="font-size: 12px; margin-top: 8px;">
+          Open the project folder in your file manager to use these files. Crew does not upload them anywhere.
         </div>
       </div>
 
@@ -188,6 +240,12 @@ const totalGates = computed(() => session.value?.gate_results?.length ?? 0);
 .stat-label { font-size: 11.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
 .stat-value { font-size: 18px; font-weight: 700; margin-top: 2px; }
 
+.deliverable-path { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; margin-bottom: 10px; }
+.deliverable-list { display: flex; flex-direction: column; gap: 4px; }
+.deliverable-file { display: grid; grid-template-columns: 16px auto auto 1fr; align-items: center; gap: 8px; font-size: 13px; padding: 5px 8px; background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); }
+.deliverable-name { font-weight: 600; }
+.deliverable-full { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+.changed-list { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--dim); max-height: 160px; overflow: auto; }
 .phases-list { display: flex; flex-direction: column; gap: 4px; }
 .phase-row { display: grid; grid-template-columns: 24px 1fr auto auto; align-items: center; gap: 10px; padding: 6px 10px; background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); font-size: 13px; }
 .phase-row.success { border-left: 3px solid var(--green); }

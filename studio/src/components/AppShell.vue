@@ -63,8 +63,8 @@ function isActive(id: ScreenId): boolean {
             <rect x="4" y="21" width="13" height="5" rx="2.5" fill="var(--amber)" />
           </svg>
           <div class="brand-text">
-            <span class="brand-name">CREW</span>
-            <span class="brand-tag">studio</span>
+            <span class="brand-name">Crew</span>
+            <span class="brand-tag">Platform</span>
           </div>
         </div>
 

@@ -659,7 +659,7 @@ const wordCount = computed(() => {
           <div class="bg-zinc-900/70 border border-zinc-800 rounded p-3 text-xs space-y-1.5">
             <div class="font-bold text-zinc-300 flex items-center gap-1.5">
               <CheckCircle2 class="w-4 h-4 text-emerald-400" />
-              SSSF Factory Readiness Check
+              Crew Readiness Check
             </div>
             <div class="text-zinc-400">✓ Specification title & overview defined</div>
             <div class="text-zinc-400">✓ Architectural boundaries and protected files specified</div>
