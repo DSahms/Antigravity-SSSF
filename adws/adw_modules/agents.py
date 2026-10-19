@@ -128,7 +128,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
         def observe(event: dict) -> None:
             forwarder(event)
             if event.get("type") == "tool_execution_end":
-                permissions.enforce(run, phase, agent, tree_before)
+                permissions.enforce(run, phase, agent, tree_before, recover=planner_recover)
         try:
             result = agent_pi.run(
                 request,
@@ -138,7 +138,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                     f"{agent.coding_agent} {agent.name} {agent.model}"),
                 on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid))
         finally:
-            permissions.enforce(run, phase, agent, tree_before)
+            permissions.enforce(run, phase, agent, tree_before, recover=planner_recover)
         run.add_usage(result.tokens, result.cost)
         spent.merge(result.usage)
         latest = result
@@ -148,6 +148,11 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     # send in this phase — first prompt, JSON retries, gate corrections — is
     # measured against this one baseline.
     tree_before = permissions.snapshot(run)
+
+    # Bounded backstop for the planner's one known path improvisation: the
+    # engine owns the plan destination (see _misplaced_plan_recoverer). Every
+    # other agent, and every other path, enforces exactly as before.
+    planner_recover = _misplaced_plan_recoverer(run, phase, agent)
 
     result = send(user_text)
     envelope, attempt = _parse_with_retries(run, phase, call, result, send)
@@ -184,7 +189,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     # accepted: an agent does not get to report success on a phase in which it
     # wrote somewhere it was not allowed to.
     try:
-        touched = permissions.enforce(run, phase, agent, tree_before)
+        touched = permissions.enforce(run, phase, agent, tree_before, recover=planner_recover)
     except permissions.PermissionBreach as breach:
         run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
                                      type="error", name="permission_breach",
@@ -238,6 +243,90 @@ def _agent_session_id(run, agent: AgentConfig) -> str:
     if entry and entry.get("model") == agent.model:
         return entry["session_id"]           # rejoin the existing context window
     return f"sssf-{run.adw_id}-{agent.name}-{new_id(4)}"
+
+
+# Parent directory names the planner has used instead of the engine-owned
+# `context_handoff/` when writing plan.md — observed in real runs, not guessed.
+_PLAN_RECOVERY_PARENTS = frozenset({"context_handoff", "context_handoff_dir"})
+
+
+def _misplaced_plan_recoverer(run, phase, agent):
+    """Relocate a misplaced plan.md to the engine-owned destination.
+
+    The planner must write exactly one artifact outside `specs/`: the plan at
+    `<context_handoff_dir>/plan.md`. The small local model intermittently
+    writes it to a lookalike path instead (`context_handoff/plan.md` at the
+    repo root, `sessions/<adw>/context_handoff/plan.md`, or a literal
+    `context_handoff_dir/plan.md`). The content is right; only the location is
+    wrong — failing the whole phase over that wastes a 40k-token plan.
+
+    This recovers at most ONE non-empty plan.md per phase, only for the
+    planner, only into the engine-owned destination, and never clobbers an
+    existing plan with different content. The relocation is recorded as a
+    `recovery` trace event and a console note, so it is auditable. Anything
+    else — other agents, other files, conflicting content — enforces and rolls
+    back exactly as before.
+    """
+    if agent.name != "planner":
+        return None
+    expected = Path(run.repo_root) / run.context_handoff_dir / "plan.md"
+
+    def recover(breach_paths: list[str]) -> list[str]:
+        recovered = []
+        for rel in breach_paths:
+            if recovered:
+                break                              # bounded: one artifact
+            src = Path(run.repo_root) / rel
+            if src.name != "plan.md" or src.parent.name not in _PLAN_RECOVERY_PARENTS:
+                continue
+            try:
+                content = src.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if not content.strip():
+                continue                           # empty file: let the breach stand
+            if expected.exists():
+                try:
+                    same = expected.read_text(encoding="utf-8", errors="replace") == content
+                except OSError:
+                    continue
+                if not same:
+                    continue                       # never clobber a real plan
+            else:
+                expected.parent.mkdir(parents=True, exist_ok=True)
+                expected.write_text(content, encoding="utf-8", errors="replace")
+            try:
+                src.unlink()
+                parent = src.parent
+                root = Path(run.repo_root).resolve()
+                while parent.resolve() != root and parent.name in _PLAN_RECOVERY_PARENTS | {"sessions", run.adw_id}:
+                    try:
+                        parent.rmdir()             # only empty dirs go
+                    except OSError:
+                        break
+                    parent = parent.parent
+            except OSError:
+                continue
+            recovered.append(rel)
+            payload = {"from": rel, "to": str(Path(run.context_handoff_dir) / "plan.md"),
+                       "reason": "misplaced plan.md relocated to the engine-owned destination"}
+            tracer = getattr(run, "tracer", None)
+            if tracer is not None:
+                try:
+                    from .data_types import EventRecord
+                    tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
+                                             type="recovery", name=agent.name, payload=payload))
+                except Exception:
+                    pass
+            console = getattr(run, "console", None)
+            if console is not None:
+                try:
+                    console.note(f"recovery: moved misplaced {rel} to the plan destination")
+                except Exception:
+                    pass
+        return recovered
+
+    return recover
 
 
 def _event_forwarder(run, phase: Phase, agent_name: str):

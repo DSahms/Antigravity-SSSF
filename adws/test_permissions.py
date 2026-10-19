@@ -1,5 +1,5 @@
 # /// script
-# dependencies = ["pydantic"]
+# dependencies = ["pydantic", "pyyaml", "python-dotenv"]
 # ///
 """Regression checks for content-aware permission enforcement, using isolated repositories."""
 import subprocess
@@ -49,6 +49,83 @@ class PermissionTests(unittest.TestCase):
         with self.assertRaises(permissions.PermissionBreach):
             permissions.enforce(self.run, None, self.agent, before)
         self.assertFalse(file.exists())
+
+
+class PlannerRecoveryTests(unittest.TestCase):
+    """The engine owns the plan destination; a misplaced plan.md is relocated,
+    audited, and bounded — everything else still breaches."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="crew-recovery-")
+        self.root = Path(self.temp.name)
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        (self.root / "protected.txt").write_text("initial\n")
+        subprocess.run(["git", "add", "."], cwd=self.root, check=True)
+        from adw_modules import agents
+        self.run = SimpleNamespace(
+            repo_root=self.root,
+            context_handoff_dir=Path("adws/adw_data/sessions/deadbeef/context_handoff"),
+            adw_id="deadbeef",
+            cfg=SSSFConfig(),
+        )
+        self.phase = SimpleNamespace(phase_id="deadbeef_02_plan")
+        self.planner = AgentConfig(name="planner", purpose="test", writes=["specs/"],
+                                   prompt_engineering={"system": "x", "user": "y"})
+        self.recover = agents._misplaced_plan_recoverer(self.run, self.phase, self.planner)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def test_literal_context_handoff_dir_is_relocated(self):
+        from adw_modules import agents as _a
+        _ = _a  # import sanity: recoverer came from the engine module
+        before = permissions.snapshot(self.run)
+        stray = self.root / "context_handoff" / "plan.md"
+        stray.parent.mkdir(parents=True)
+        stray.write_text("# real plan\n")
+        touched = permissions.enforce(self.run, self.phase, self.planner, before, recover=self.recover)
+        dest = self.root / "adws" / "adw_data" / "sessions" / "deadbeef" / "context_handoff" / "plan.md"
+        self.assertEqual(dest.read_text(), "# real plan\n")
+        self.assertFalse(stray.exists())
+        self.assertFalse((self.root / "context_handoff").exists())
+        self.assertNotIn("context_handoff/plan.md", touched)
+
+    def test_relative_sessions_path_is_relocated(self):
+        before = permissions.snapshot(self.run)
+        stray = self.root / "sessions" / "deadbeef" / "context_handoff" / "plan.md"
+        stray.parent.mkdir(parents=True)
+        stray.write_text("# plan v2\n")
+        permissions.enforce(self.run, self.phase, self.planner, before, recover=self.recover)
+        dest = self.root / "adws" / "adw_data" / "sessions" / "deadbeef" / "context_handoff" / "plan.md"
+        self.assertEqual(dest.read_text(), "# plan v2\n")
+        self.assertFalse(stray.exists())
+
+    def test_conflicting_plan_is_not_clobbered(self):
+        dest = self.root / "adws" / "adw_data" / "sessions" / "deadbeef" / "context_handoff" / "plan.md"
+        dest.parent.mkdir(parents=True)
+        dest.write_text("# correct plan\n")
+        before = permissions.snapshot(self.run)
+        stray = self.root / "context_handoff" / "plan.md"
+        stray.parent.mkdir(parents=True)
+        stray.write_text("# impostor plan\n")
+        with self.assertRaises(permissions.PermissionBreach):
+            permissions.enforce(self.run, self.phase, self.planner, before, recover=self.recover)
+        self.assertEqual(dest.read_text(), "# correct plan\n")
+
+    def test_other_files_still_breach(self):
+        before = permissions.snapshot(self.run)
+        evil = self.root / "context_handoff" / "notes.txt"
+        evil.parent.mkdir(parents=True)
+        evil.write_text("nope")
+        with self.assertRaises(permissions.PermissionBreach):
+            permissions.enforce(self.run, self.phase, self.planner, before, recover=self.recover)
+        self.assertFalse(evil.exists())
+
+    def test_non_planner_gets_no_recoverer(self):
+        from adw_modules import agents
+        scout = AgentConfig(name="scout", purpose="test", writes=[],
+                            prompt_engineering={"system": "x", "user": "y"})
+        self.assertIsNone(agents._misplaced_plan_recoverer(self.run, self.phase, scout))
 
 
 if __name__ == "__main__":

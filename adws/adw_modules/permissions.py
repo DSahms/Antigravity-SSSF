@@ -189,7 +189,8 @@ def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str]) ->
     return "rolled back" if result.returncode == 0 else "could not roll back"
 
 
-def enforce(run, phase, agent: AgentConfig, before: dict[str, str]) -> list[str]:
+def enforce(run, phase, agent: AgentConfig, before: dict[str, str],
+            recover=None) -> list[str]:
     """Compare the tree against `before`; undo and raise if the agent overstepped.
 
     Returns the paths it legitimately changed, so the trace records what an
@@ -198,10 +199,23 @@ def enforce(run, phase, agent: AgentConfig, before: dict[str, str]) -> list[str]
     Detection alone would leave the repo holding the unauthorized change while
     reporting a failure, so anything the agent introduced outside its allowlist
     is rolled back before the phase dies. What it cannot undo, it names.
+
+    `recover` is an optional bounded escape hatch: `recover(breach_paths)`
+    relocates misplaced-but-unambiguous artifacts to engine-owned destinations
+    itself and returns the paths it resolved. Enforcement then re-snapshots and
+    re-evaluates — anything still outside the allowlist is rolled back and
+    raised exactly as if no recovery had been attempted. Recovery never widens
+    what an agent may touch; it only fixes *where* one known artifact landed.
     """
     after = snapshot(run)
     touched = changed_paths(before, after)
     breaches = [p for p in touched if after.get(p) == "outside-root" or not permitted(p, agent, run.cfg)]
+    if breaches and recover is not None:
+        recovered = recover(breaches) or []
+        if recovered:
+            after = snapshot(run)
+            touched = changed_paths(before, after)
+            breaches = [p for p in touched if after.get(p) == "outside-root" or not permitted(p, agent, run.cfg)]
     if not breaches:
         return touched
 
