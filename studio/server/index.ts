@@ -477,6 +477,12 @@ const server = Bun.serve({
       } satisfies HealthResponse);
     }),
 
+    // ── STUDIO VERSION ENDPOINT ──────────────────────────────────────────
+
+    "/api/version": safely(() => {
+      return json({ name: 'C.R.E.W. Software', version: '1.0.0' });
+    }),
+
     "/api/sessions": safely((req) => {
       const db = getDb();
       if (!db) return json([]);
