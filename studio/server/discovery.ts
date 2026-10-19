@@ -19,6 +19,23 @@ import type {
   DiscoverySuggestionItem,
 } from "../shared/types.ts";
 
+/** Parse the interviewer's reply, tolerating fences and leading prose from
+ * small models. Throws a plain-language error only when no JSON object exists.
+ */
+export function parseInterviewerJson(text: string): any {
+  const stripped = text.replace(/^\s*```(?:json)?\s*/, "").replace(/\s*```\s*$/, "");
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    const start = stripped.indexOf("{");
+    const end = stripped.lastIndexOf("}");
+    if (start !== -1 && end > start) {
+      return JSON.parse(stripped.slice(start, end + 1));
+    }
+    throw new Error("The interviewer didn't return a readable response. Try again; your input is saved.");
+  }
+}
+
 export class DiscoveryEngine {
   private targetDir: string;
   private currentSession: DiscoverySessionState | null = null;
@@ -179,19 +196,37 @@ export class DiscoveryEngine {
       const headers: Record<string, string> = { "content-type": "application/json" };
       if (profile.apiKey && profile.apiKey !== "none") headers.authorization = `Bearer ${profile.apiKey}`;
       const system = `You are Crew Platform's thoughtful software interviewer. Ask one useful question at a time, with up to three suggested answers. Draw out tacit knowledge, accessibility needs, priorities, constraints, and what success looks like. Be gentle and practical. Offer solutions to gaps; do not interrogate or silently invent answers. Preserve user statements and mark assumptions. Do not use tools or execute work. Return ONLY JSON: {"title":"short title","reply":"conversational response and next question if needed","ready":false,"questions":[{"question":"next necessary question","choices":["choice"]}],"specMarkdown":"# Title\\n\\n## Goal\\n...\\n\\n## Requirements\\n...\\n\\n## Acceptance Criteria\\n...\\n\\n## Boundaries\\n..."}. Mark ready true only when the goal, requirements, boundaries, and concrete acceptance checks are supplied, no required questions remain, and the user has been shown a summary. A user can explicitly scope a smaller deliverable. Final approval is always the user's choice. Current draft follows:\n${session.specMarkdown}`;
-      const response = await fetch(profile.baseUrl.replace(/\/+$/, "") + "/chat/completions", {
-        method: "POST", headers, signal: AbortSignal.timeout(120000),
-        body: JSON.stringify({ model: profile.model, messages: [{ role: "system", content: system }, ...session.chatHistory.slice(-24).map(m => ({ role: m.role, content: m.content }))], max_tokens: 4096 }),
-      });
-      if (!response.ok) throw new Error(`Interviewer connection returned HTTP ${response.status}. Check Settings → Test connection.`);
-      const data = await response.json() as any;
-      const text = data?.choices?.[0]?.message?.content;
-      if (typeof text !== "string") throw new Error("The interviewer returned no usable response.");
-      const result = JSON.parse(text.replace(/^\s*```(?:json)?\s*/, "").replace(/\s*```\s*$/, ""));
+      const messages = [{ role: "system", content: system }, ...session.chatHistory.slice(-24).map(m => ({ role: m.role, content: m.content }))];
+      const ask = async (extra: Array<{ role: string; content: string }>) => {
+        const res = await fetch(profile.baseUrl.replace(/\/+$/, "") + "/chat/completions", {
+          method: "POST", headers, signal: AbortSignal.timeout(120000),
+          body: JSON.stringify({ model: profile.model, messages: [...messages, ...extra], max_tokens: 4096 }),
+        });
+        if (!res.ok) throw new Error(`Interviewer connection returned HTTP ${res.status}. Check Settings → Test connection.`);
+        const data = await res.json() as any;
+        const text = data?.choices?.[0]?.message?.content;
+        if (typeof text !== "string") throw new Error("The interviewer returned no usable response.");
+        return text;
+      };
+      let result: any;
+      try {
+        result = parseInterviewerJson(await ask([]));
+      } catch {
+        // One bounded retry: small models sometimes narrate first. Nudge once
+        // for JSON-only; if it still fails, the gentle error below stands.
+        result = parseInterviewerJson(await ask([{ role: "user", content: "Your last response was not valid JSON. Reply again with ONLY the JSON object described in the system prompt — no prose, no code fences." }]));
+      }
       if (typeof result.title !== "string" || typeof result.reply !== "string" || typeof result.specMarkdown !== "string" || !Array.isArray(result.questions)) throw new Error("The interviewer response was incomplete. Try again; your input is saved.");
-      const questions = result.questions.map((q: any, i: number) => {
-        if (typeof q.question !== "string" || !Array.isArray(q.choices) || !q.choices.every((c: unknown) => typeof c === "string")) throw new Error("The interviewer returned an invalid question.");
-        return { id: `question-${Date.now()}-${i}`, question: q.question, choices: q.choices.slice(0, 3), answered: false };
+      const questions = result.questions.flatMap((q: any, i: number) => {
+        // Tolerant: small models emit malformed options. A question without
+        // usable choices is still a question — it renders without suggested
+        // answers instead of failing the whole turn.
+        const text = typeof q === "string" ? q : q?.question;
+        if (typeof text !== "string" || !text.trim()) return [];
+        const choices = (Array.isArray(q?.choices) ? q.choices : [])
+          .filter((c: unknown) => typeof c === "string" && (c as string).trim())
+          .slice(0, 3);
+        return [{ id: `question-${Date.now()}-${i}`, question: text, choices, answered: false }];
       });
       session.title = result.title;
       session.specMarkdown = result.specMarkdown;
