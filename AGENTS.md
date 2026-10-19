@@ -15,7 +15,7 @@ Owner: David. Expect dictation errors, short-hand names, run-on sentences. Infer
 - Routine reversible decisions: autonomous. Ask only when choice changes product, adds cost, risks work loss, or needs missing access.
 - No new paid providers for convenience. Use existing connections. Never print or commit secrets. `.env` is gitignored.
 
-## Repo structure (authoritative base: former C.R.E.W.-Technologies, branch flow-and-onboarding)
+## Repo structure (consolidated 2026-10-19 onto `main`; `flow-and-onboarding` retired)
 
 - `studio/` — Vue + Bun server (`server/index.ts`, `server/launcher.ts`, `server/discovery.ts`, `server/project.ts`, `server/approvals.ts`). UI on :4620. Keep `studio/`, `/api/studio/*`, `/api/sessions/*` identifiers.
 - `adws/` — deterministic Python engine + `adw_modules/`, prompt templates, `adw_simple_sdlc.py` full build, `adw_plan.py` plan-only.

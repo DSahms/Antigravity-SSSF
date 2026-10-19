@@ -1,7 +1,7 @@
 # HANDOFF — C.R.E.W. Software
 
-**Canonical:** `D:\dev\C.R.E.W.-Software`, branch `flow-and-onboarding`
-**GitHub:** `DSahms/crew-software` (`main` default). Pushed through `a34008d`; this file is the tip commit.
+**Canonical:** `D:\dev\C.R.E.W.-Software`, branch `main`
+**GitHub:** `DSahms/crew-software` (`main` default, pushed through this commit; `flow-and-onboarding` retired after merge)
 **Backup:** `D:\_crew-backup-2026-10-19` (verified bundles + files)
 **Archive:** `D:\_crew-archive-2026-10-19` (5 folders moved; `crew-platform` was a junction to Super Simple, archive repaired with real copy)
 
