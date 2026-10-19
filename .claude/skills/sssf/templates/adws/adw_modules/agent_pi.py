@@ -273,7 +273,7 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
     stderr_thread.start()
     if on_spawn:
         on_spawn(process.pid)
-    with raw_path.open("a") as raw:
+    with raw_path.open("a", encoding="utf-8") as raw:
         assert process.stdout is not None
         for line in process.stdout:
             raw.write(line)

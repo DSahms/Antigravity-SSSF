@@ -157,6 +157,9 @@ sssf.db*
 # CREW runtime — approval book + connection profiles + drafts (all per-target)
 .sssf/
 
+# local telemetry / generated ids — never commit
+.freebuff/
+
 # demo app runtime (example branch)
 apps/inkwell/inkwell.db*
 

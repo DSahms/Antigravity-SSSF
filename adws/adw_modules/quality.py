@@ -89,6 +89,8 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
             env=env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=spec.timeout_seconds,
         )
         returncode = completed.returncode
@@ -140,7 +142,7 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
         passed=passed,
         duration_seconds=duration,
         output_artifact=str(output_artifact),
-        output_tail=(stdout + stderr)[-TAIL_CHARS:],
+        output_tail=((stdout or "") + (stderr or ""))[-TAIL_CHARS:],
     )
 
 

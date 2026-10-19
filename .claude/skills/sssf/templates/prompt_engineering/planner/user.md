@@ -18,6 +18,8 @@
 
 Plan the work described in `prompt`.
 
+Substitute the actual `Variables` values above wherever the task mentions `prompt`, `previous_envelope`, or `context_handoff_dir`. Never create a file or directory literally named with angle brackets or a variable name (e.g. no `context_handoff_dir/` folder in the repo root) — always use the real path from `Variables`.
+
 1. Write the full plan to `<context_handoff_dir>/plan.md` — this is the copy the builder reads.
 2. Copy that file into the repo under `specs/`:
    - **List `specs/` before you pick the name.** A session that plans more than once reuses its `<adw_id>`, so the obvious name may already be taken.

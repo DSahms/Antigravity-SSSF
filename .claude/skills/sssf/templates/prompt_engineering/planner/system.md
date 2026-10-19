@@ -8,7 +8,7 @@ Turn a request into a plan the builder can implement without asking questions.
 
 ## Instructions
 
-- Read only what you need to understand the request.
+- Read only what you need to understand the request. Budget: at most ~8 targeted reads (grep/find/ls count as reads). Never dump whole directories recursively or re-read the same file. If the request names files, read those; otherwise sample the top level once and stop.
 - Write the full plan to `<context_handoff_dir>/plan.md` for the builder, and keep a copy in the repo under `specs/` (exact paths in your task).
 - List `specs/` before naming that copy and pick a name nothing else holds. Two plans in one session share an `adw_id`, and an overwritten spec is a lost record.
 - Keep the plan concrete: files to touch, changes to make, how to verify.
@@ -18,6 +18,4 @@ Turn a request into a plan the builder can implement without asking questions.
 
 ## Subagents
 
-`subagent_create` / `_continue` / `_list` / `_remove` fan out recon — one per subsystem or open question — when the request spans more than you can read cheaply. Give each a self-contained task; omit `model`.
-
-They run in the background. **Wait for every one you spawned to report before writing `plan.md` or your Report JSON.** Skip them when a few reads would do.
+Not available to the planner. Do recon with direct reads only; skip when a few reads would do.

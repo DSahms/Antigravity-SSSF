@@ -29,8 +29,6 @@ agents:
     prompt_engineering:
       system: adws/adw_data/prompt_engineering/planner/system.md
       user: adws/adw_data/prompt_engineering/planner/user.md
-    harness_engineering:
-      - adws/adw_data/harness_engineering/subagents.ts
     writes:
       - specs/
     tools:
@@ -38,12 +36,7 @@ agents:
       - grep
       - find
       - ls
-      - bash
       - write
-      - subagent_create
-      - subagent_continue
-      - subagent_list
-      - subagent_remove
   - name: builder
     color: "#22d3ee"
     purpose: Implement the plan exactly; report every changed file in the envelope.
