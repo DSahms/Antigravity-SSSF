@@ -37,9 +37,9 @@ Full `C.R.E.W.-Technologies` tree including `.git` (branches `main`, `flow-and-o
 - Secret review: no `sk-` keys in `studio/server`; `.env` ignored and unstaged; `.freebuff/project-id` excluded as generated artifact
 - Suggestions file + release audit present in canonical `docs/`
 
-## Left unresolved
+## Left unresolved (Stage 2 took these on — see HANDOFF for evidence)
 
 - `crew-platform`'s 9 ahead commits were never pushed (remote missing) and belong to a different (Next.js `src/`) architecture; preserved in backup bundle, not merged
-- `studio/package-lock.json` + `studio/bun.lock` both exist; dead views (`LaunchView`, `DiscoveryView`, `ObservabilityView`, `HistoryView`) remain — noted in audit P2, not changed here
-- `docs/CREW_IMPLEMENTATION_STATUS.md` link target still missing (audit P1-9); manuals present but staleness pass is Stage 2 work
-- No commit/push done yet at time of writing — see HANDOFF for next action
+- `studio/package-lock.json` + `studio/bun.lock` both exist; dead views remain — noted in audit P2, not changed here
+- `docs/CREW_IMPLEMENTATION_STATUS.md` link target still missing (audit P1-9); manuals staleness pass still to do
+- Consolidation commits pushed: `759edd8` (canonical) → `1dfc521` (planner bounds + health regression) → `a34008d` (UTF-8 sweep); this HANDOFF update is the tip
