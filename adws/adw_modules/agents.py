@@ -310,4 +310,4 @@ def _persist_envelope(run, phase: Phase, agent_name: str, call: AgentCall,
         record = {"agent_name": agent_name, "purpose": resolve(run.cfg, agent_name).purpose,
                   "output_type": call.output_type.__name__, "attempt": attempt,
                   **envelope.model_dump()}
-        (run.session_dir / agent_name / "envelope.json").write_text(json.dumps(record, indent=2))
+        (run.session_dir / agent_name / "envelope.json").write_text(json.dumps(record, indent=2), encoding="utf-8", errors="replace")

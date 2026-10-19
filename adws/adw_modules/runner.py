@@ -60,7 +60,7 @@ class Run:
     # ── agent map (adw_id -> per-agent coding-agent session ids) ────────────
     def save_agent_map(self, agent: str, entry: dict) -> None:
         self.agent_map[agent] = entry
-        self._agent_map_path.write_text(json.dumps(self.agent_map, indent=2))
+        self._agent_map_path.write_text(json.dumps(self.agent_map, indent=2), encoding="utf-8", errors="replace")
 
     # ── usage (run totals mirror what the tracer accumulates in sqlite) ─────
     def add_usage(self, tokens: int, cost: float) -> None:

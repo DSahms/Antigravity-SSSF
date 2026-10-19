@@ -17,5 +17,5 @@ def save(directory: str | Path, name: str, content: str) -> Path:
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / name
-    path.write_text(content)
+    path.write_text(content, encoding="utf-8", errors="replace")
     return path

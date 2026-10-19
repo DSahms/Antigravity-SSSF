@@ -101,7 +101,8 @@ def verdict_consistent(envelope: EnvelopeBase, run) -> GateReport:
 def tests_pass(command: str):
     """Gate factory: the given shell command must exit 0."""
     def gate(envelope: EnvelopeBase, run) -> GateReport:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        result = subprocess.run(command, shell=True, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace")
         ok = result.returncode == 0
         note = f"exit {result.returncode}"
         if not ok:

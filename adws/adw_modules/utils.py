@@ -69,7 +69,8 @@ def engineer_name() -> str:
         return name
     try:
         out = subprocess.run(["git", "config", "user.name"],
-                             capture_output=True, text=True, timeout=5)
+                             capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=5)
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.strip()
     except OSError:

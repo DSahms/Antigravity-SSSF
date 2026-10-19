@@ -52,7 +52,7 @@ class TreeSnapshot(dict):
 
 
 def _git(args: list[str], cwd) -> str:
-    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8")
+    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
         raise RuntimeError("Git could not inspect the working tree; permission checking cannot proceed.")
     return result.stdout

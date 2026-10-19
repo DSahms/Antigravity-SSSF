@@ -59,6 +59,7 @@ def _pi_catalog() -> list[tuple[str, str, int]]:
     try:
         result = subprocess.run(
             [*_pi_command(), "--list-models"], capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
             timeout=30, env=operator_env(), check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
