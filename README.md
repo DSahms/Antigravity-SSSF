@@ -26,6 +26,16 @@ Open http://127.0.0.1:4620. Git, Node.js, uv, and the Pi coding-agent CLI are re
 
 The manuals also open from Help inside Crew.
 
+## Conversational intake is central
+
+A customer must be able to discuss their business, needs, constraints, and
+desired outcomes through multiple exchanges before approving a specification.
+Use New Job: talk it through (microphone supported), answer the interviewer's
+follow-up questions, and revise the working spec until it reads right.
+Importing a Markdown brief is an alternative starting point — the interviewer
+inspects it for gaps and continues clarification where needed. Nothing runs
+without the customer's explicit approval of the specification.
+
 ## Current verification boundary
 
 The UI, controls, permissions, and simulated-agent workflow have passed checks. A live router run reached planning and was stopped by its reporting cap. A complete real generated product is not yet verified. Reporting caps can overshoot when a turn reports usage in a batch. Other industry verticals remain planned.
