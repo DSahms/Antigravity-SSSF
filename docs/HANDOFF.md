@@ -121,8 +121,11 @@ recovery, 3/3 phases, 68k tokens), and shown running.
    (≤90k) instead of burning 250k+. Last success 26k plan. Stronger planner
    model remains the structural fix; per-role models already supported.
 2. `approvedBy` for pre-fix approvals still says "Lead Engineer" (historical, kept).
-3. Dead views (`LaunchView`, `DiscoveryView`, `ObservabilityView`, `HistoryView`)
-   and dual lockfiles remain (audit P2, untouched).
+3. Dead views removed (`LaunchView`, `DiscoveryView`, `ObservabilityView`,
+   `HistoryView` — verified unreferenced, build+typecheck green after removal).
+   Stale `package-lock.json` removed (nothing live uses npm; bun is the
+   toolchain). Full release certification on `main`: build ok, vue-tsc pass,
+   check.mjs pass, vitest 9/9, permissions 12/12, workflow 3/3.
 4. Documenter write-up recovered and committed (see above); the original 8304ad1d
    run record honestly remains 8/9.
 
