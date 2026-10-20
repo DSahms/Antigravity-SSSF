@@ -5,7 +5,12 @@
 **Backup:** `D:\_crew-backup-2026-10-19` (verified bundles + files)
 **Archive:** `D:\_crew-archive-2026-10-19` (5 folders moved; `crew-platform` was a junction, repaired)
 
-## Status — WORKING GENERATED SOFTWARE milestone COMPLETE
+## Status — THREE WORKING APPS milestone COMPLETE
+
+Guestbook, Color Keeper, and now Word Counter (`index.html`: paste text →
+words 12 / chars 62 / sentences 4 / reading time, empty state zeros — all
+verified live). Each produced by the approved UI workflow, each with its plan
+spec, app file, and agent write-up committed on `main`.
 
 David's guestbook app exists, runs, and persists: `guestbook.html` (single file,
 vanilla, localStorage). Signed live in a browser tab; entry survived reload.
@@ -75,9 +80,16 @@ recovery, 3/3 phases, 68k tokens), and shown running.
   the complete write-up before tripping on tail turns, so that agent artifact
   (`app_docs/d0c90005_color-keeper-app.md`, verified accurate) was committed
   instead of re-running. No phases repeated, no commits duplicated.
+- Word Counter (third app): 3-turn intake → approval → full SDLC, plan green,
+  builder tripped 150k at 170k WITH `index.html` complete (4.2KB in one write;
+  economical tools, heavy per-turn context). Verified live: 12 words / 62 chars
+  / 4 sentences / <1 min correct, empty state zeros. Documenter tripped 100k at
+  104.9k AFTER writing complete `app_docs/d0c90006_word-counter-utility.md`
+  (verified accurate, clean UTF-8) — committed as the artifact. Builder ceiling
+  raised 150k→200k on this evidence (two real builds needed 152k and 170k).
 - Budget diagnosis: costs are per-turn context (~15–25k/turn), not loops —
   usage progressions are linear, not spiky. Ceilings now planner 120k /
-  builder 150k / reviewer 80k / documenter 100k. Residual pattern: models burn
+  builder 200k / reviewer 80k / documenter 100k. Residual pattern: models burn
   tail turns after the deliverable exists; future work is a completion guard,
   not higher ceilings.
 - Budget diagnosis, not blind raises: documenter needs ~50–68k for a full
@@ -92,6 +104,9 @@ recovery, 3/3 phases, 68k tokens), and shown running.
   empty state + `[]` verified) and "Persist Purple" (reload → rendered +
   stored JSON verified). Copy success-branch confirmed by marker test
   (automation clipboard reads are policy-denied; one human click confirms).
+- Word Counter acceptance, live tab: synthetic paste exercised live — 12 words /
+  62 chars / 4 sentences / <1 min all correct, empty state zeros. Single file,
+  no persistence per spec, plain styling.
   Delete/copy controls separate; keyboard-native swatch buttons; validation
   and storage-error branches present in source.
 - Suites: `bun run build` ok, `vue-tsc` pass, `check.mjs` pass, `vitest` 9/9,

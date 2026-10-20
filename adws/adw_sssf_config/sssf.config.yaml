@@ -41,7 +41,7 @@ agents:
   - name: builder
     color: "#22d3ee"
     purpose: Implement the plan exactly; report every changed file in the envelope.
-    max_tokens: 150000
+    max_tokens: 200000
     prompt_engineering:
       system: adws/adw_data/prompt_engineering/builder/system.md
       user: adws/adw_data/prompt_engineering/builder/user.md

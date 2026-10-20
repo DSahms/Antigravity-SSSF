@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Word Counter</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: 2rem 1rem 4rem;
+      background: #f4f5f7;
+      color: #1f2430;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .app {
+      max-width: 46rem;
+      margin: 0 auto;
+    }
+
+    .text-input {
+      display: block;
+      width: 100%;
+      min-height: 16rem;
+      resize: vertical;
+      padding: 0.85rem 1rem;
+      border: 1px solid #d6dae1;
+      border-radius: 10px;
+      background: #ffffff;
+      color: inherit;
+      font: inherit;
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .text-input:focus-visible {
+      outline: 2px solid #3a6ea5;
+      outline-offset: 2px;
+    }
+
+    .metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .metric {
+      flex: 1 1 9rem;
+      min-width: 9rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid #e2e5ea;
+      border-radius: 10px;
+      background: #ffffff;
+    }
+
+    .metric__label {
+      display: block;
+      font-size: 0.78rem;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #5b6474;
+    }
+
+    .metric__value {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <textarea id="text-input" class="text-input" aria-label="Text to measure" placeholder="Type or paste your text here…" spellcheck="false"></textarea>
+
+    <section class="metrics" aria-label="Text metrics" aria-live="polite">
+      <div class="metric">
+        <span class="metric__label">Words</span>
+        <span class="metric__value" id="word-count">0</span>
+      </div>
+      <div class="metric">
+        <span class="metric__label">Characters</span>
+        <span class="metric__value" id="character-count">0</span>
+      </div>
+      <div class="metric">
+        <span class="metric__label">Sentences</span>
+        <span class="metric__value" id="sentence-count">0</span>
+      </div>
+      <div class="metric">
+        <span class="metric__label">Reading time</span>
+        <span class="metric__value" id="reading-time">&lt; 1 min</span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var WORDS_PER_MINUTE = 200;
+
+      var textInput = document.getElementById('text-input');
+      var wordCountEl = document.getElementById('word-count');
+      var characterCountEl = document.getElementById('character-count');
+      var sentenceCountEl = document.getElementById('sentence-count');
+      var readingTimeEl = document.getElementById('reading-time');
+
+      function countWords(text) {
+        var trimmed = text.trim();
+        if (trimmed === '') {
+          return 0;
+        }
+        return trimmed.split(/\s+/).length;
+      }
+
+      function countCharacters(text) {
+        return text.length;
+      }
+
+      function countSentences(text) {
+        var trimmed = text.trim();
+        if (trimmed === '') {
+          return 0;
+        }
+        var parts = trimmed.split(/[.!?]+/);
+        var count = 0;
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].trim() !== '') {
+            count++;
+          }
+        }
+        return count;
+      }
+
+      function formatReadingTime(wordCount) {
+        if (wordCount < WORDS_PER_MINUTE) {
+          return '< 1 min';
+        }
+        return Math.ceil(wordCount / WORDS_PER_MINUTE) + ' min';
+      }
+
+      function update() {
+        var text = textInput.value;
+        var words = countWords(text);
+        wordCountEl.textContent = String(words);
+        characterCountEl.textContent = String(countCharacters(text));
+        sentenceCountEl.textContent = String(countSentences(text));
+        readingTimeEl.textContent = formatReadingTime(words);
+      }
+
+      textInput.addEventListener('input', update);
+      update();
+    })();
+  </script>
+</body>
+</html>
