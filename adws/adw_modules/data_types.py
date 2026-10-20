@@ -311,6 +311,11 @@ class AgentConfig(BaseModel):
     prompt_engineering: PromptEngineering
     harness_engineering: list[str] = Field(default_factory=list)
     tools: Optional[list[str]] = None    # allowlist; None = all tools usable
+    # Hard per-agent spend ceiling in tokens, enforced by the engine while the
+    # agent works (see agents._budget_tracker). Counts the same per-turn
+    # context occupancy the trace records. None = unbounded (outer run cap
+    # still applies). Prompts alone do not bind a small model; this does.
+    max_tokens: Optional[int] = None
     # What this agent may MODIFY in the repo, enforced in code after every call
     # (see adw_modules/permissions.py). `tools` cannot express this: `bash` runs
     # anything and `write` reaches any path, so an agent's capability list is a
@@ -329,6 +334,7 @@ class ConfigDefaults(BaseModel):
     color: str = ""
     harness_engineering: list[str] = Field(default_factory=list)
     tools: Optional[list[str]] = None    # roster-wide allowlist; None = all tools usable
+    max_tokens: Optional[int] = None     # roster-wide agent spend ceiling; per-agent wins
     # Off-limits to every agent that has not named them in its own `writes`.
     # The factory's own code is the default: an agent must not be able to edit
     # the machinery that decides whether its work passed.

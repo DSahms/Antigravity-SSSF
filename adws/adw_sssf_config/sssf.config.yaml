@@ -26,6 +26,7 @@ agents:
     thinking: high
     color: "#a78bfa"
     purpose: Turn a request into a plan the builder can implement without asking questions.
+    max_tokens: 60000
     prompt_engineering:
       system: adws/adw_data/prompt_engineering/planner/system.md
       user: adws/adw_data/prompt_engineering/planner/user.md
@@ -40,6 +41,7 @@ agents:
   - name: builder
     color: "#22d3ee"
     purpose: Implement the plan exactly; report every changed file in the envelope.
+    max_tokens: 150000
     prompt_engineering:
       system: adws/adw_data/prompt_engineering/builder/system.md
       user: adws/adw_data/prompt_engineering/builder/user.md
@@ -76,6 +78,7 @@ agents:
     thinking: high
     color: "#fb7185"
     purpose: Confirm that what was built is what was asked for; change nothing.
+    max_tokens: 80000
     prompt_engineering:
       system: adws/adw_data/prompt_engineering/reviewer/system.md
       user: adws/adw_data/prompt_engineering/reviewer/user.md
@@ -91,6 +94,7 @@ agents:
     model: openai/gpt-5.6-luna
     color: "#e879f9"
     purpose: Write up the change that was just made, from the diff; document only.
+    max_tokens: 40000
     prompt_engineering:
       system: adws/adw_data/prompt_engineering/documenter/system.md
       user: adws/adw_data/prompt_engineering/documenter/user.md

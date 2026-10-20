@@ -140,5 +140,29 @@ class PlannerRecoveryTests(unittest.TestCase):
         self.assertIsNone(agents._misplaced_plan_recoverer(self.run, self.phase, scout))
 
 
+class BudgetTrackerTests(unittest.TestCase):
+    """The engine-owned spend ceiling trips on cumulative turn occupancy."""
+
+    def test_trips_past_ceiling(self):
+        from adw_modules import agents
+        track = agents._budget_tracker("planner", 10000)
+        track({"totalTokens": 6000})
+        with self.assertRaises(agents.TokenBudgetExceeded):
+            track({"totalTokens": 5000})
+
+    def test_stays_quiet_under_ceiling(self):
+        from adw_modules import agents
+        track = agents._budget_tracker("builder", 150000)
+        track({"totalTokens": 60000})
+        track({"input": 20000, "output": 5000, "cacheRead": 10000, "cacheWrite": 0})
+        # no raise: 60000 + 35000 < 150000
+
+    def test_none_limit_never_trips(self):
+        from adw_modules import agents
+        track = agents._budget_tracker("scout", None)
+        track({"totalTokens": 999999999})
+        # no raise
+
+
 if __name__ == "__main__":
     unittest.main()

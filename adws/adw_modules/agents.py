@@ -28,13 +28,22 @@ class GateFailure(RuntimeError):
     pass
 
 
+class TokenBudgetExceeded(RuntimeError):
+    """An agent burned past its roster-configured spend ceiling mid-turn.
+
+    Raised inside the event callback, where agent_pi.run kills the coding-agent
+    child and propagates — so the phase fails cleanly with a plain message
+    instead of running to the outer run cap."""
+
+
 # ── config ───────────────────────────────────────────────────────────────────
 
 def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConfig:
     raw = yaml.safe_load(Path(path).read_text()) or {}
     defaults = raw.get("defaults", {}) or {}
     for agent in raw.get("agents", []) or []:
-        for key in ("coding_agent", "model", "thinking", "color", "tools", "writes"):
+        for key in ("coding_agent", "model", "thinking", "color", "tools", "writes", "max_tokens",
+                    "harness_engineering"):
             if key in defaults:
                 agent.setdefault(key, defaults[key])
         agent.setdefault("harness_engineering", defaults.get("harness_engineering", []))
@@ -125,8 +134,13 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             cwd=str(run.repo_root),
         )
         forwarder = _event_forwarder(run, phase, agent.name)
+        track_budget = _budget_tracker(agent.name, agent.max_tokens)
         def observe(event: dict) -> None:
             forwarder(event)
+            if event.get("type") == "message_end" and event.get("message", {}).get("role") == "assistant":
+                # Engine-owned spend ceiling: trips mid-turn, kills the child
+                # via agent_pi's BaseException path, fails the phase cleanly.
+                track_budget(event["message"].get("usage", {}) or {})
             if event.get("type") == "tool_execution_end":
                 permissions.enforce(run, phase, agent, tree_before, recover=planner_recover)
         try:
@@ -236,6 +250,26 @@ def _as_report(result) -> GateReport:
     if isinstance(result, GateReport):
         return result
     return GateReport(checks=[GateCheck(item=str(v), ok=False) for v in (result or [])])
+
+
+def _budget_tracker(agent_name: str, limit: Optional[int]):
+    """Per-turn spend meter for one agent call. Returns an observer to feed
+    each assistant message's usage dict; raises TokenBudgetExceeded past the
+    ceiling. A None limit observes nothing (outer run cap still applies)."""
+    spent = 0
+
+    def observe_turn(usage: dict) -> None:
+        nonlocal spent
+        if limit is None:
+            return
+        spent += agent_pi._context_tokens(usage or {})
+        if spent >= limit:
+            raise TokenBudgetExceeded(
+                f"{agent_name} exceeded its {limit:,}-token budget "
+                f"({spent:,} used). Narrow the task or raise max_tokens for "
+                f"{agent_name} in adws/adw_sssf_config/sssf.config.yaml.")
+
+    return observe_turn
 
 
 def _agent_session_id(run, agent: AgentConfig) -> str:
