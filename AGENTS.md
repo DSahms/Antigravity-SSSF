@@ -14,6 +14,7 @@ Owner: David. Expect dictation errors, short-hand names, run-on sentences. Infer
 - Requirements vs suggestions: preserve Intake → Lock → Build → Verify and enforced approval. Never weaken acceptance to claim done.
 - Routine reversible decisions: autonomous. Ask only when choice changes product, adds cost, risks work loss, or needs missing access.
 - No new paid providers for convenience. Use existing connections. Never print or commit secrets. `.env` is gitignored.
+- Process hygiene (2026-10-19 incident): never terminate processes by executable name. A cleanup step must name the exact PID recorded at launch and verify its command line before touching it. Foreign processes (Hermes, Codex, anything outside this repo) are never ours to stop. If a stray process must die and ownership is unclear: stop, identify via launch scripts/logs, ask David.
 
 ## Repo structure (consolidated 2026-10-19 onto `main`; `flow-and-onboarding` retired)
 

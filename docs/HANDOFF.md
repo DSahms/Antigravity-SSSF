@@ -10,7 +10,25 @@
 David's guestbook app exists, runs, and persists: `guestbook.html` (single file,
 vanilla, localStorage). Signed live in a browser tab; entry survived reload.
 Produced by the full approved UI workflow (approval by David Sahms), committed
-by the factory itself (`e16a814`), tested, reviewed, and shown running.
+by the factory itself (`e16a814`), tested, reviewed, documented
+(`app_docs/d0c90002_single_page_guestbook.md` via supported `adw_document`
+recovery, 3/3 phases, 68k tokens), and shown running.
+
+## Incident 2026-10-19 — collateral process shutdown (resolved)
+
+- While stopping my own demo web server I ran `Stop-Process -Name python`,
+  killing David's two Hermes gateway processes (venv supervisor + runtime worker).
+- No further cleanup was performed until ownership was established.
+- Identified from `gateway.pid`, `gateway-starts.log`, and the verified
+  `gateway-service/Hermes_Gateway.{cmd,vbs}` launchers (no credentials in them;
+  `config.yaml`/vault never read).
+- Restored with the user's own verified launcher (`Hermes_Gateway.vbs`).
+  Verified: original topology back (one venv supervisor + its one runtime
+  worker), `gateway.pid` fresh, `gateway.log` showing clean startup
+  ("Turn machinery warmed", housekeeping started, kanban lock held), no
+  duplicates. Sammy and its corpus never touched.
+- Durable fix: process-hygiene rule in AGENTS.md (PID + command-line verified,
+  never kill by executable name, foreign processes off-limits).
 
 ## Decisions
 
@@ -44,11 +62,19 @@ by the factory itself (`e16a814`), tested, reviewed, and shown running.
 ## Verification evidence (canonical, real connections, no mocks)
 
 - Full UI journey v2: 5-turn intake → 4/4 confirm → approval (David Sahms) →
-  full SDLC 8/9 phases green (plan→build→test→review→commits), exit via
-  documenter budget trip (40k→70k on evidence). App committed by factory.
-- Guestbook acceptance, live tab: signed "David", entry rendered with timestamp,
-  reload → entry persisted from localStorage. Spec items verified in source:
-  single file, maxlengths 50/200, ISO timestamps, demo notice, no frameworks.
+  full SDLC 8/9 phases green (plan→build→test→review→commits). Documenter tripped
+  its 40k ceiling at 51,459; recovered through the supported `adw_document
+  --base` path in an isolated worktree (no repeated phases, no duplicate
+  commits; 8304ad1d's fail left intact as the true record). Write-up
+  (`app_docs/d0c90002_single-page-guestbook.md`) verified accurate, committed.
+- Budget diagnosis, not blind raises: documenter needs ~50–68k for a full
+  write-up on this model (observed 51,459 and 68,356) → ceiling 70k.
+  Planner 90k / builder 150k / reviewer 80k set from the same turn-count evidence.
+- Guestbook acceptance, live tab: entry "David" was SIGNED BY THIS AGENT as a
+  synthetic submit+persistence exercise — NOT David's personal sign-off. Entry
+  rendered with timestamp; reload → persisted from localStorage. Spec items
+  verified in source: single file, maxlengths 50/200, ISO timestamps, demo
+  notice, no frameworks.
 - Suites: `bun run build` ok, `vue-tsc` pass, `check.mjs` pass, `vitest` 9/9,
   `test_permissions.py` 12/12 (recovery + budget cases), `test_workflow.py` 3/3.
 - Restart persistence: results intact after server kill + reload; stuck runs now
@@ -63,8 +89,8 @@ by the factory itself (`e16a814`), tested, reviewed, and shown running.
 2. `approvedBy` for pre-fix approvals still says "Lead Engineer" (historical, kept).
 3. Dead views (`LaunchView`, `DiscoveryView`, `ObservabilityView`, `HistoryView`)
    and dual lockfiles remain (audit P2, untouched).
-4. Documenter write-up for the guestbook run never completed (budget trip at
-   40k); app + review + commits are complete without it.
+4. Documenter write-up recovered and committed (see above); the original 8304ad1d
+   run record honestly remains 8/9.
 
 ## Next concrete action
 
