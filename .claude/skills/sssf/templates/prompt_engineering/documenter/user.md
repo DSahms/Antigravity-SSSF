@@ -18,6 +18,10 @@
 
 Document the completed work described by `previous_envelope`, using `prompt` for what was originally asked.
 
+Substitute the actual `Variables` values above wherever the task mentions `prompt`, `previous_envelope`, or `context_handoff_dir`. The `context_handoff_dir` value is an absolute path — use it exactly, character for character. Never shorten it, and never create files or directories literally named with angle brackets or variable names.
+
+Keep the write-up tight: at most ~800 words covering what changed and why it matters, the files that carry it, and how to use or verify it. A short accurate page beats a long wandering one.
+
 1. Read the full diff at `previous_envelope.diff_path`, plus any changed file that needs context.
 2. Write the write-up to `<context_handoff_dir>/document.md`. Cover: what changed and why it matters, the files that carry it, and how to use or verify it.
 3. Copy that file into the repo under `app_docs/`:

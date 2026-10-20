@@ -67,6 +67,19 @@ recovery, 3/3 phases, 68k tokens), and shown running.
   --base` path in an isolated worktree (no repeated phases, no duplicate
   commits; 8304ad1d's fail left intact as the true record). Write-up
   (`app_docs/d0c90002_single-page-guestbook.md`) verified accurate, committed.
+- Color Keeper (second app, same journey): 9-turn intake → approval → full SDLC
+  to build-fail on the 150k builder ceiling — WITH `color-keeper.html` complete
+  on disk (builder finished the artifact, tripped on trailing turns). App
+  verified live (save/delete/persist/copy-path). Documenter then tripped
+  70k→100k across three attempts (51k/71k/84k/100.7k); the 100k run HAD WRITTEN
+  the complete write-up before tripping on tail turns, so that agent artifact
+  (`app_docs/d0c90005_color-keeper-app.md`, verified accurate) was committed
+  instead of re-running. No phases repeated, no commits duplicated.
+- Budget diagnosis: costs are per-turn context (~15–25k/turn), not loops —
+  usage progressions are linear, not spiky. Ceilings now planner 120k /
+  builder 150k / reviewer 80k / documenter 100k. Residual pattern: models burn
+  tail turns after the deliverable exists; future work is a completion guard,
+  not higher ceilings.
 - Budget diagnosis, not blind raises: documenter needs ~50–68k for a full
   write-up on this model (observed 51,459 and 68,356) → ceiling 70k.
   Planner 90k / builder 150k / reviewer 80k set from the same turn-count evidence.
@@ -75,6 +88,12 @@ recovery, 3/3 phases, 68k tokens), and shown running.
   rendered with timestamp; reload → persisted from localStorage. Spec items
   verified in source: single file, maxlengths 50/200, ISO timestamps, demo
   notice, no frameworks.
+- Color Keeper acceptance, live tab: synthetic entries "Test Teal" (deleted —
+  empty state + `[]` verified) and "Persist Purple" (reload → rendered +
+  stored JSON verified). Copy success-branch confirmed by marker test
+  (automation clipboard reads are policy-denied; one human click confirms).
+  Delete/copy controls separate; keyboard-native swatch buttons; validation
+  and storage-error branches present in source.
 - Suites: `bun run build` ok, `vue-tsc` pass, `check.mjs` pass, `vitest` 9/9,
   `test_permissions.py` 12/12 (recovery + budget cases), `test_workflow.py` 3/3.
 - Restart persistence: results intact after server kill + reload; stuck runs now

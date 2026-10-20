@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Color Keeper</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 2rem 1rem 4rem;
+      background: #f4f5f7;
+      color: #1f2430;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .app {
+      max-width: 44rem;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.8rem;
+      letter-spacing: -0.01em;
+    }
+
+    .tagline {
+      margin: 0 0 1.75rem;
+      color: #5b6474;
+      font-size: 0.95rem;
+    }
+
+    section {
+      background: #ffffff;
+      border: 1px solid #e2e5ea;
+      border-radius: 10px;
+      padding: 1.25rem 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    h2 {
+      margin: 0 0 1rem;
+      font-size: 1.05rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #5b6474;
+    }
+
+    .creator-form {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 1rem;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #414a5c;
+    }
+
+    .field--color {
+      flex: 0 0 auto;
+    }
+
+    .field--name {
+      flex: 1 1 12rem;
+      min-width: 0;
+    }
+
+    input[type="color"] {
+      width: 3.5rem;
+      height: 2.6rem;
+      padding: 0;
+      border: 1px solid #c8cdd6;
+      border-radius: 6px;
+      background: none;
+      cursor: pointer;
+    }
+
+    input[type="text"] {
+      padding: 0.6rem 0.7rem;
+      border: 1px solid #c8cdd6;
+      border-radius: 6px;
+      font: inherit;
+      font-weight: 400;
+      color: inherit;
+      background: #ffffff;
+    }
+
+    input[type="text"]:focus-visible,
+    input[type="color"]:focus-visible,
+    button:focus-visible {
+      outline: 3px solid #1f6feb;
+      outline-offset: 2px;
+    }
+
+    input[aria-invalid="true"] {
+      border-color: #b42318;
+      background: #fff6f5;
+    }
+
+    .button {
+      padding: 0.6rem 1.1rem;
+      border: 1px solid #1f2430;
+      border-radius: 6px;
+      background: #1f2430;
+      color: #ffffff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: #333a49;
+    }
+
+    .message {
+      margin: 0.9rem 0 0;
+      padding: 0.6rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .message--error {
+      background: #fef3f2;
+      border: 1px solid #fda29b;
+      color: #b42318;
+    }
+
+    .color-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .color-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.6rem;
+      border: 1px solid #e2e5ea;
+      border-radius: 8px;
+      background: #fbfbfc;
+    }
+
+    .color-swatch {
+      flex: 0 0 auto;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .name {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .hex {
+      flex: 0 0 auto;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 0.9rem;
+      color: #414a5c;
+      background: #eef0f4;
+      border-radius: 4px;
+      padding: 0.15rem 0.4rem;
+    }
+
+    .delete-button {
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      line-height: 1;
+      font-size: 1.1rem;
+      background: none;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+      color: #b42318;
+      cursor: pointer;
+    }
+
+    .delete-button:hover {
+      background: #fef3f2;
+    }
+
+    .empty {
+      margin: 0.5rem 0 0;
+      color: #6b7382;
+      font-style: italic;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 1.5rem;
+      transform: translateX(-50%);
+      max-width: min(90vw, 26rem);
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      background: #1f2430;
+      color: #ffffff;
+      font-size: 0.9rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      opacity: 1;
+      transition: opacity 0.15s ease;
+    }
+
+    .toast[hidden] {
+      display: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .toast {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>Color Keeper</h1>
+    <p class="tagline">Pick a color, give it a name, and keep it. Click a swatch to copy its hex code.</p>
+
+    <section class="creator" aria-labelledby="creator-heading">
+      <h2 id="creator-heading">Add a color</h2>
+      <form id="color-form" class="creator-form" novalidate>
+        <label class="field field--color" for="color-input">
+          <span>Color</span>
+          <input type="color" id="color-input" name="color" value="#4f46e5" />
+        </label>
+        <label class="field field--name" for="name-input">
+          <span>Name</span>
+          <input
+            type="text"
+            id="name-input"
+            name="name"
+            placeholder="e.g. Deep Indigo"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+        <button type="submit" id="save-button" class="button">Save color</button>
+      </form>
+      <p id="validation-message" class="message message--error" role="alert" hidden></p>
+      <p id="storage-message" class="message message--error" role="alert" hidden></p>
+    </section>
+
+    <section class="saved" aria-labelledby="saved-heading">
+      <h2 id="saved-heading">Saved colors</h2>
+      <ul id="color-list" class="color-list"></ul>
+      <p id="empty-state" class="empty">No colors saved yet. Pick one above and give it a name.</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var STORAGE_KEY = 'color-keeper.colors';
+      var HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+      var COPY_TOAST_MS = 1500;
+      var ERROR_TOAST_MS = 4000;
+
+      var form = document.getElementById('color-form');
+      var colorInput = document.getElementById('color-input');
+      var nameInput = document.getElementById('name-input');
+      var saveButton = document.getElementById('save-button');
+      var validationMessage = document.getElementById('validation-message');
+      var storageMessage = document.getElementById('storage-message');
+      var colorList = document.getElementById('color-list');
+      var emptyState = document.getElementById('empty-state');
+      var toast = document.getElementById('toast');
+
+      // In-memory list is always the source of truth for the UI.
+      var colors = [];
+      var storageOk = true;
+      var toastTimer = null;
+
+      /* ------------------------------------------------------------------ *
+       * Storage
+       * ------------------------------------------------------------------ */
+
+      function isValidEntry(entry) {
+        return !!entry &&
+          typeof entry.hex === 'string' &&
+          typeof entry.name === 'string' &&
+          HEX_PATTERN.test(entry.hex);
+      }
+
+      function clearStoredValue() {
+        try {
+          window.localStorage.removeItem(STORAGE_KEY);
+        } catch (err) {
+          storageOk = false;
+        }
+      }
+
+      function loadColors() {
+        var raw;
+        try {
+          raw = window.localStorage.getItem(STORAGE_KEY);
+        } catch (err) {
+          // Storage access itself failed (private mode, disabled cookies, ...).
+          storageOk = false;
+          return [];
+        }
+
+        if (raw === null || raw === '') {
+          return [];
+        }
+
+        var parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (err) {
+          // Corrupt payload: drop it and carry on with an empty list.
+          clearStoredValue();
+          return [];
+        }
+
+        if (!Array.isArray(parsed)) {
+          clearStoredValue();
+          return [];
+        }
+
+        var cleaned = [];
+        for (var i = 0; i < parsed.length; i += 1) {
+          if (isValidEntry(parsed[i])) {
+            cleaned.push({ hex: parsed[i].hex, name: parsed[i].name });
+          }
+        }
+        return cleaned;
+      }
+
+      function persistColors() {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(colors));
+          return true;
+        } catch (err) {
+          storageOk = false;
+          return false;
+        }
+      }
+
+      /* ------------------------------------------------------------------ *
+       * Messages
+       * ------------------------------------------------------------------ */
+
+      function showToast(text, ms) {
+        if (toastTimer) {
+          window.clearTimeout(toastTimer);
+          toastTimer = null;
+        }
+        toast.textContent = text;
+        toast.hidden = false;
+        toastTimer = window.setTimeout(function () {
+          toast.hidden = true;
+          toastTimer = null;
+        }, ms || COPY_TOAST_MS);
+      }
+
+      function showValidation(text) {
+        validationMessage.textContent = text;
+        validationMessage.hidden = false;
+      }
+
+      function clearValidation() {
+        validationMessage.textContent = '';
+        validationMessage.hidden = true;
+        nameInput.removeAttribute('aria-invalid');
+      }
+
+      function showStorageError(text) {
+        storageMessage.textContent = text;
+        storageMessage.hidden = false;
+      }
+
+      function clearStorageError() {
+        storageMessage.textContent = '';
+        storageMessage.hidden = true;
+      }
+
+      /* ------------------------------------------------------------------ *
+       * Render
+       * ------------------------------------------------------------------ */
+
+      function renderList() {
+        colorList.innerHTML = '';
+
+        for (var i = 0; i < colors.length; i += 1) {
+          colorList.appendChild(buildItem(colors[i], i));
+        }
+
+        emptyState.hidden = colors.length > 0;
+      }
+
+      function buildItem(entry, index) {
+        var item = document.createElement('li');
+        item.className = 'color-item';
+        item.dataset.index = String(index);
+
+        // A native <button> gives us pointer, Enter and Space activation for free.
+        var swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = entry.hex;
+        swatch.dataset.hex = entry.hex;
+        swatch.dataset.action = 'copy';
+        swatch.dataset.index = String(index);
+        swatch.setAttribute('aria-label', 'Copy hex ' + entry.hex + ' for ' + entry.name);
+        swatch.title = 'Click to copy ' + entry.hex;
+
+        var name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = entry.name;
+
+        var hex = document.createElement('code');
+        hex.className = 'hex';
+        hex.textContent = entry.hex;
+
+        // Separate control, so copying never deletes and deleting never copies.
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'delete-button';
+        remove.dataset.action = 'delete';
+        remove.dataset.index = String(index);
+        remove.textContent = '\u00d7';
+        remove.setAttribute('aria-label', 'Delete ' + entry.name);
+        remove.title = 'Delete ' + entry.name;
+
+        item.appendChild(swatch);
+        item.appendChild(name);
+        item.appendChild(hex);
+        item.appendChild(remove);
+        return item;
+      }
+
+      /* ------------------------------------------------------------------ *
+       * Copy
+       * ------------------------------------------------------------------ */
+
+      function legacyCopy(text) {
+        var area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', 'readonly');
+        area.style.position = 'fixed';
+        area.style.top = '0';
+        area.style.left = '-9999px';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        var copied = false;
+        try {
+          copied = document.execCommand('copy');
+        } catch (err) {
+          copied = false;
+        }
+        document.body.removeChild(area);
+        return copied;
+      }
+
+      function copyHex(hex) {
+        var viaClipboard = navigator.clipboard &&
+          typeof navigator.clipboard.writeText === 'function' &&
+          window.isSecureContext;
+
+        if (!viaClipboard) {
+          finishCopy(legacyCopy(hex));
+          return;
+        }
+
+        navigator.clipboard.writeText(hex).then(
+          function () { finishCopy(true); },
+          function () { finishCopy(legacyCopy(hex)); }
+        );
+      }
+
+      function finishCopy(copied) {
+        if (copied) {
+          showToast('Copied!', COPY_TOAST_MS);
+        } else {
+          showToast('Could not copy the hex code. Select and copy it manually.', ERROR_TOAST_MS);
+        }
+      }
+
+      /* ------------------------------------------------------------------ *
+       * Save / delete
+       * ------------------------------------------------------------------ */
+
+      function saveColor() {
+        var name = nameInput.value.trim();
+
+        if (name === '') {
+          showValidation('Please give the color a name before saving.');
+          nameInput.setAttribute('aria-invalid', 'true');
+          nameInput.focus();
+          return;
+        }
+
+        clearValidation();
+
+        // Use the picker's value verbatim so the shown code is byte-identical.
+        var hex = colorInput.value;
+
+        // Replacement is keyed on the hex value only; names may repeat.
+        var index = -1;
+        for (var i = 0; i < colors.length; i += 1) {
+          if (colors[i].hex === hex) {
+            index = i;
+            break;
+          }
+        }
+
+        if (index === -1) {
+          colors.push({ hex: hex, name: name });
+        } else {
+          colors[index] = { hex: hex, name: name };
+        }
+
+        // Render first, so the color stays visible even if persistence fails.
+        renderList();
+
+        if (persistColors()) {
+          clearStorageError();
+          nameInput.value = '';
+        } else {
+          showStorageError(
+            'Could not save to this browser\u2019s local storage. "' + name + '" is available for this session only.'
+          );
+          showToast('Not saved to this browser \u2014 session only.', ERROR_TOAST_MS);
+        }
+      }
+
+      function deleteColor(index) {
+        if (typeof index !== 'number' || index < 0 || index >= colors.length) {
+          return;
+        }
+
+        var removed = colors[index];
+        colors.splice(index, 1);
+        renderList();
+
+        if (persistColors()) {
+          clearStorageError();
+          return;
+        }
+
+        // The write failed, so the stored list still contains the entry.
+        // Put it back rather than showing a list that silently reappears on reload.
+        colors.splice(index, 0, removed);
+        renderList();
+        showStorageError(
+          'Could not save to this browser\u2019s local storage. "' + removed.name + '" was not removed.'
+        );
+        showToast('Not saved to this browser \u2014 session only.', ERROR_TOAST_MS);
+      }
+
+      /* ------------------------------------------------------------------ *
+       * Events
+       * ------------------------------------------------------------------ */
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        saveColor();
+      });
+
+      nameInput.addEventListener('input', function () {
+        if (validationMessage.hidden === false) {
+          clearValidation();
+        }
+      });
+
+      colorList.addEventListener('click', function (event) {
+        var target = event.target;
+        if (!target || typeof target.closest !== 'function') {
+          return;
+        }
+
+        var swatch = target.closest('.color-swatch');
+        if (swatch && colorList.contains(swatch)) {
+          copyHex(swatch.dataset.hex);
+          return;
+        }
+
+        var remove = target.closest('.delete-button');
+        if (remove && colorList.contains(remove)) {
+          deleteColor(Number(remove.dataset.index));
+        }
+      });
+
+      /* ------------------------------------------------------------------ *
+       * Init
+       * ------------------------------------------------------------------ */
+
+      function init() {
+        colors = loadColors();
+        renderList();
+
+        if (!storageOk) {
+          showStorageError(
+            'Browser storage is unavailable \u2014 colors will last for this session only.'
+          );
+          showToast('Browser storage is unavailable \u2014 session only.', ERROR_TOAST_MS);
+        }
+
+        if (saveButton) {
+          saveButton.disabled = false;
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
