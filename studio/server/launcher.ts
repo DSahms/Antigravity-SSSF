@@ -150,6 +150,7 @@ export class WorkflowLauncher {
   }
 
   private loadHistory(): void {
+    this.reconcileInterruptedRuns();
     try {
       const history = JSON.parse(readFileSync(join(this.targetDir, "adws/adw_data/studio_history.json"), "utf8"));
       for (const saved of history.runs ?? []) {
@@ -162,6 +163,32 @@ export class WorkflowLauncher {
         });
       }
     } catch {}
+  }
+
+  /** Mark runs that died with the server as failed, so nothing shows
+   * "running" forever. A session left in `running` with no live child process
+   * belongs to a previous server lifetime — this server owns no children for
+   * it yet (childProcesses starts empty), so reconciling here is always safe.
+   * Open phases/processes close with the reason recorded. */
+  private reconcileInterruptedRuns(): void {
+    const dbPath = join(this.targetDir, "adws", "adw_data", "sssf.db");
+    if (!existsSync(dbPath)) return;
+    let db: Database | undefined;
+    try {
+      db = new Database(dbPath);
+      db.exec("PRAGMA busy_timeout=5000");
+      const endedAt = new Date().toISOString();
+      const reason = "server restarted while this run was active; no live process";
+      db.transaction(() => {
+        db!.query("UPDATE sessions SET status='fail', ended_at=?, total_tokens=COALESCE(total_tokens,0) WHERE status='running'").run(endedAt);
+        db!.query("UPDATE phases SET status='fail', ended_at=?, error=? WHERE ended_at IS NULL AND status='running'").run(endedAt, reason);
+        db!.query("UPDATE processes SET ended_at=? WHERE ended_at IS NULL").run(endedAt);
+      })();
+    } catch {
+      // A locked or missing trace db must never block startup.
+    } finally {
+      db?.close();
+    }
   }
 
   setApprovalBook(book: ApprovalBook) {
