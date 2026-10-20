@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Crew Platform — guided creation with a Python workflow engine",
+  "description": "C.R.E.W. Software — guided creation with a Python workflow engine",
   "scripts": {
     "dev": "vite",
     "server": "bun run server/index.ts",

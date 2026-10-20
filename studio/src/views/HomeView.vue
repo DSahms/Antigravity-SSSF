@@ -62,7 +62,7 @@ function draftHasContent(d?: DiscoverySessionState | null): boolean {
 
     <!-- First-run nudge -->
     <div v-if="showFirstRun" class="callout" style="margin-bottom: 18px;">
-      <strong>Welcome to Crew Platform.</strong>
+      <strong>Welcome to C.R.E.W. Software.</strong>
       What do you want to create today? Explain the idea; your crew helps turn it into a reviewed result.
       Take a 30-second tour?
       <button class="btn btn-ghost btn-xs" style="margin-left: 8px;" @click="startTour('firstrun')">Start tour</button>

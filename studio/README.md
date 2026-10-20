@@ -1,4 +1,4 @@
-# Crew Platform interface and local service
+# C.R.E.W. Software interface and local service
 
 Vue supplies the interface; Bun serves the local API and built frontend. Python remains the software workflow coordinator.
 

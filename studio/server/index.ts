@@ -6,7 +6,7 @@
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { SssfDb } from "./db.ts";
-import { ProjectManager } from "./project.ts";
+import { ProjectManager, engineerName } from "./project.ts";
 import { DiscoveryEngine } from "./discovery.ts";
 import { ConfigManager } from "./config.ts";
 import { WorkflowLauncher } from "./launcher.ts";
@@ -409,8 +409,14 @@ const server = Bun.serve({
         };
         if (!body.specMarkdown?.trim()) return badRequest("spec is empty");
         if (!body.workflowId) return badRequest("workflowId is required");
-        if (!body.approvedBy?.trim()) return badRequest("approvedBy is required");
-        return json(approvalBook.approve(body));
+        // The client sends no typed identity by design. A blank name, or the
+        // legacy "Lead Engineer" default, resolves to the real configured
+        // identity (ENGINEER_NAME, else this project's git user). Past records
+        // are never rewritten.
+        const sent = body.approvedBy?.trim() ?? "";
+        const approvedBy = sent && sent !== "Lead Engineer" ? sent : engineerName(projectMgr.getTargetDir());
+        if (!approvedBy) return badRequest("approvedBy is required");
+        return json(approvalBook.approve({ ...body, approvedBy }));
       }),
     },
 

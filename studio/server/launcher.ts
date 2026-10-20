@@ -45,6 +45,21 @@ const WORKFLOW_METADATA: Record<
     recommendedWhen: "When building real features from an approved specification. Expect a long, token-heavy run.",
     badge: "Full build",
   },
+  "adw_build.py": {
+    name: "Build Once",
+    description: "Single builder pass against the approved spec. Leaves changes uncommitted for hand review.",
+    phases: ["request", "build"],
+    requiredAgents: ["builder"],
+    recommendedWhen: "Tiny changes where the author will verify by hand.",
+  },
+  "adw_plan_build_test_quality.py": {
+    name: "Plan, Build, Test & Quality Gate",
+    description: "Agent chain plus deterministic checks: plan → build → bounded verify/fix loops → commit.",
+    phases: ["request", "plan", "build", "verify", "fix", "commit"],
+    requiredAgents: ["planner", "builder"],
+    recommendedWhen: "Real features that must pass the project's own test, lint, typecheck, and build commands.",
+    badge: "Thorough",
+  },
   "adw_plan_build_test.py": {
     name: "Plan, Build & Test",
     description: "Standard engineering cycle: architectural plan, builder implementation, deterministic tests, and git commit.",

@@ -121,6 +121,18 @@ class PlannerRecoveryTests(unittest.TestCase):
             permissions.enforce(self.run, self.phase, self.planner, before, recover=self.recover)
         self.assertFalse(evil.exists())
 
+    def test_root_level_plan_still_breaches(self):
+        # plan.md directly at the repo root is NOT an authorized shape:
+        # recovery only accepts context_handoff-style parents.
+        before = permissions.snapshot(self.run)
+        stray = self.root / "plan.md"
+        stray.write_text("# stray plan\n")
+        with self.assertRaises(permissions.PermissionBreach):
+            permissions.enforce(self.run, self.phase, self.planner, before, recover=self.recover)
+        self.assertFalse(stray.exists())
+        dest = self.root / "adws" / "adw_data" / "sessions" / "deadbeef" / "context_handoff" / "plan.md"
+        self.assertFalse(dest.exists())
+
     def test_non_planner_gets_no_recoverer(self):
         from adw_modules import agents
         scout = AgentConfig(name="scout", purpose="test", writes=[],

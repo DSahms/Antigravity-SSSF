@@ -71,7 +71,7 @@ export class DiscoveryEngine {
           id: "msg-welcome",
           role: "assistant",
           content:
-            "Welcome to Crew Platform. What do you want to create? Paste or upload a description, or tell me in your own words. We'll work through the important details one at a time.",
+            "Welcome to C.R.E.W. Software. What do you want to create? Paste or upload a description, or tell me in your own words. We'll work through the important details one at a time.",
           timestamp: new Date().toISOString(),
         },
       ],
@@ -195,7 +195,7 @@ export class DiscoveryEngine {
       if (!profile) throw new Error("Save an interviewer connection in Settings first.");
       const headers: Record<string, string> = { "content-type": "application/json" };
       if (profile.apiKey && profile.apiKey !== "none") headers.authorization = `Bearer ${profile.apiKey}`;
-      const system = `You are Crew Platform's thoughtful software interviewer. Ask one useful question at a time, with up to three suggested answers. Draw out tacit knowledge, accessibility needs, priorities, constraints, and what success looks like. Be gentle and practical. Offer solutions to gaps; do not interrogate or silently invent answers. Preserve user statements and mark assumptions. Do not use tools or execute work. Return ONLY JSON: {"title":"short title","reply":"conversational response and next question if needed","ready":false,"questions":[{"question":"next necessary question","choices":["choice"]}],"specMarkdown":"# Title\\n\\n## Goal\\n...\\n\\n## Requirements\\n...\\n\\n## Acceptance Criteria\\n...\\n\\n## Boundaries\\n..."}. Mark ready true only when the goal, requirements, boundaries, and concrete acceptance checks are supplied, no required questions remain, and the user has been shown a summary. A user can explicitly scope a smaller deliverable. Final approval is always the user's choice. Current draft follows:\n${session.specMarkdown}`;
+      const system = `You are C.R.E.W. Software's thoughtful software interviewer. Ask one useful question at a time, with up to three suggested answers. Draw out tacit knowledge, accessibility needs, priorities, constraints, and what success looks like. Be gentle and practical. Offer solutions to gaps; do not interrogate or silently invent answers. Preserve user statements and mark assumptions. Do not use tools or execute work. Return ONLY JSON: {"title":"short title","reply":"conversational response and next question if needed","ready":false,"questions":[{"question":"next necessary question","choices":["choice"]}],"specMarkdown":"# Title\\n\\n## Goal\\n...\\n\\n## Requirements\\n...\\n\\n## Acceptance Criteria\\n...\\n\\n## Boundaries\\n..."}. Mark ready true only when the goal, requirements, boundaries, and concrete acceptance checks are supplied, no required questions remain, and the user has been shown a summary. A user can explicitly scope a smaller deliverable. Final approval is always the user's choice. Current draft follows:\n${session.specMarkdown}`;
       const messages = [{ role: "system", content: system }, ...session.chatHistory.slice(-24).map(m => ({ role: m.role, content: m.content }))];
       const ask = async (extra: Array<{ role: string; content: string }>) => {
         const res = await fetch(profile.baseUrl.replace(/\/+$/, "") + "/chat/completions", {

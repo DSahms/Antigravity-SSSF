@@ -11,6 +11,20 @@ import type {
 
 const QUALITY_KEYS = ["test", "lint", "typecheck", "build"] as const;
 
+/** Who is approving? Real configured identity, never invented.
+ * `ENGINEER_NAME` wins, then the target directory's git user, then the legacy
+ * fallback. Historical approval records keep whatever string they stored. */
+export function engineerName(targetDir: string): string {
+  const env = (process.env.ENGINEER_NAME ?? "").trim();
+  if (env) return env;
+  try {
+    const got = Bun.spawnSync(["git", "config", "user.name"], { cwd: targetDir, stdout: "pipe", stderr: "ignore" });
+    const name = got.stdout?.toString().trim();
+    if (got.exitCode === 0 && name) return name;
+  } catch {}
+  return "Lead Engineer";
+}
+
 export class ProjectManager {
   private targetDir: string;
   private readonly factoryRoot: string;
@@ -105,7 +119,7 @@ export class ProjectManager {
     if (existsSync(profiles)) cpSync(profiles, join(target, ".sssf", "profiles.json"));
     writeFileSync(join(target, ".gitignore"), ".sssf/\nadws/adw_data/sessions/\n*.db*\n.env*\nnode_modules/\n__pycache__/\n");
     writeFileSync(join(target, ".env"), "");
-    writeFileSync(join(target, "README.md"), `# ${name}\n\nCreated with Crew Platform. Describe your app in New Job.\n`);
+    writeFileSync(join(target, "README.md"), `# ${name}\n\nCreated with C.R.E.W. Software. Describe your app in New Job.\n`);
     for (const args of [["init"], ["add", "."], ["-c", "user.name=Crew Platform", "-c", "user.email=crew@localhost", "commit", "-m", "Create project baseline"]]) {
       if (Bun.spawnSync(["git", ...args], { cwd: target, stdout: "ignore", stderr: "ignore" }).exitCode !== 0) throw new Error("Could not prepare the new project's Git history.");
     }
