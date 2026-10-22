@@ -108,7 +108,7 @@ No model calls, no commits, no key handling involved — fully reproducible.
 - `bfb5bd7` / `c07fbb8` electron main as `.cjs`, wired into package+config
 - `6468a74` relative vite base so packaged `file://` UI loads its assets
 - `d1a2eb4` preserve REA investigation feature and recovery-tree product work
-- (this report + install docs: next commit)
+- `7c13999` this report + install docs
 
 ## Verdict
 
