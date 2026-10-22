@@ -160,6 +160,12 @@ sssf.db*
 # CREW runtime — approval book + connection profiles + drafts (all per-target)
 .sssf/
 
+# Generated Windows installer output (electron-builder). Never committed:
+# it is ~1GB per build and contaminates test discovery (bun test matches
+# stale copies under release/). Build it with the documented command and
+# verify the installed app instead.
+/release/
+
 # local telemetry / generated ids — never commit
 .freebuff/
 
