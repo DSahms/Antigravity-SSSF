@@ -1,0 +1,61 @@
+{
+  "appId": "com.crew.software",
+  "productName": "CREW Software",
+  "copyright": "Copyright © 2026 CREW Technologies. All rights reserved.",
+  "asar": false,
+  "directories": {
+    "output": "../release"
+  },
+  "files": [
+    "electron-main.js",
+    "dist/**/*",
+    "server/**/*",
+    "shared/**/*",
+    "package.json",
+    "!**/__pycache__",
+    "!**/*.db*",
+    "!**/studio_history.json"
+  ],
+  "extraResources": [
+    {
+      "from": "C:/Users/david/.bun/bin/bun.exe",
+      "to": "bun.exe"
+    },
+    {
+      "from": "../adws",
+      "to": "adws",
+      "filter": [
+        "**/*",
+        "!**/__pycache__",
+        "!**/*.db*",
+        "!adw_data/sessions/**",
+        "!adw_data/sssf.db*",
+        "!**/studio_history.json"
+      ]
+    },
+    {
+      "from": "../docs",
+      "to": "docs"
+    },
+    {
+      "from": "../.crew-quality.json",
+      "to": ".crew-quality.json"
+    }
+  ],
+  "win": {
+    "target": [
+      "nsis"
+    ]
+  },
+  "mac": {
+    "target": "dmg"
+  },
+  "linux": {
+    "target": "AppImage"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}

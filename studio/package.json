@@ -1,19 +1,25 @@
 {
   "name": "crew-platform",
   "version": "1.0.0",
+  "main": "electron-main.js",
   "private": true,
   "type": "module",
   "description": "C.R.E.W. Software — guided creation with a Python workflow engine",
   "scripts": {
     "dev": "vite",
-    "server": "bun run server/index.ts",
     "start": "bun run server/index.ts",
-    "dev:all": "bun run server/index.ts & vite",
     "build": "node node_modules/vue-tsc/bin/vue-tsc.js --noEmit && node node_modules/vite/bin/vite.js build",
     "typecheck": "node node_modules/vue-tsc/bin/vue-tsc.js --noEmit",
     "test": "bun test test/core.bun.test.ts",
     "test:tour": "node node_modules/vitest/vitest.mjs run test/tour-overlap.test.ts",
-    "test:approval": "node node_modules/vitest/vitest.mjs run test/approval-enforcement.test.ts"
+    "test:approval": "node node_modules/vitest/vitest.mjs run test/approval-enforcement.test.ts",
+    "postinstall": "vite build",
+    "electron": "electron .",
+    "electron:build": "electron-builder",
+    "electron:start": "electron .",
+    "electron:pack": "electron-builder --dir",
+    "electron:dist": "electron-builder --win --x64",
+    "electron:publish": "electron-builder --win --x64 --publish always"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
@@ -31,6 +37,9 @@
     "typescript": "^5.7.2",
     "vite": "^7",
     "vitest": "^2",
-    "vue-tsc": "^3"
+    "vue-tsc": "^3",
+    "electron": "^29.3.0",
+    "electron-builder": "^24.13.3",
+    "electron-is-dev": "^3.0.1"
   }
 }
