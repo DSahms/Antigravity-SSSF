@@ -2,7 +2,8 @@
 //
 // Starts the embedded Bun server and presents the prebuilt frontend.
 // Layout inside the installed app (asar disabled so Bun can read sources):
-//   <install>/resources/app/electron-main.js   (this file)
+//   <install>/resources/app/electron-main.cjs   (this file, .cjs so the
+//   "type": "module" app package cannot misload it as ESM)
 //   <install>/resources/app/server/index.ts    (Bun server, needs ./node_modules)
 //   <install>/resources/app/dist/index.html    (prebuilt UI)
 //   <install>/resources/app/node_modules/yaml  (production deps, auto-included)

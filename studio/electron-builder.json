@@ -7,7 +7,7 @@
     "output": "../release"
   },
   "files": [
-    "electron-main.js",
+    "electron-main.cjs",
     "dist/**/*",
     "server/**/*",
     "shared/**/*",
