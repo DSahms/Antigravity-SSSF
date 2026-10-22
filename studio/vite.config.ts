@@ -25,4 +25,8 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
   },
+  // Relative asset URLs so the prebuilt UI also loads from file:// inside
+  // the Electron shell (absolute "/assets/..." resolves to the filesystem
+  // root there and renders a blank white window).
+  base: "./",
 });
