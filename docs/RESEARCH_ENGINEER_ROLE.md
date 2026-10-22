@@ -1,29 +1,55 @@
-# Research Engineer (future role) — interface design, not built
+# REA integration — current implementation
 
-**Status:** design only. Do NOT install REA or build this capability today.
+REA is an optional investigation stage inside the approved Build workflow.
+Intake -> Lock -> Build -> Verify and ApprovalBook enforcement remain intact.
+Everything in this recovery is uncommitted working-tree work.
 
-## Purpose
+The engine invokes pinned `npx -y rea-agents@6.7.0
+analyze-javascript-application <target> --json` before any interpretation agent.
+This static analyzer reads inert JavaScript artifacts without executing them.
+Only local JavaScript directories and ASAR are enabled. Native, managed,
+database, model, device, remote and runtime investigations are not enabled by
+this integration. No MCP registration, global configuration or paid provider
+is needed for collection.
 
-A software-specific investigator: studies useful features or legacy workflows,
-returns evidence plus adaptation proposals, and optionally produces an original
-prototype. It feeds the existing factory — it never bypasses review or approval.
+The approved specification must contain exactly one block:
 
-## Contract
+```crew-rea
+{"question":"Which module handles normalization?","target":"D:/owned/synthetic-app","scope":"Static inventory of the entire selected directory only","permitted_actions":"static-local"}
+```
 
-- **Input:** a research question + scope (files, docs, or a legacy workflow) recorded like any job intake.
-- **Output:** an evidence pack (what exists, where, with source references) and an adaptation proposal (what to change, which requirement it serves, conflicts with which ADR).
-- **Optional prototype:** clearly marked throwaway, built under a case directory, never merged without the normal Intake → Lock → Build → Verify path.
-- **Disposition:** every proposal lands in review with accept / revise / dismiss, reasons recorded — the same gate as F2/F3 adversarial findings.
+Choose the narrowest target tree authorized for inspection. The scope covers
+that tree; the engine does not interpret prose as a file-selection language.
+The interpreter must preserve all four approved strings. Studio loads the
+assignment from the exact approved spec, not launch-request overrides or model
+output. Invalid/missing assignments fail before collection or agent execution.
+Direct Python use remains an operator-facing engine entry point; ApprovalBook
+is enforced by Studio, as with existing workflows.
 
-## Extension point in this architecture
+`rea_collect` persists complete raw JSON in the run's context_handoff directory.
+It will not overwrite an existing evidence file. Errors persist sanitized
+command/exit/diagnostic details in rea_diagnostic.json; failure never becomes a
+finding. Environment fixtures cannot bypass real collection.
 
-- New roster entry in `adws/adw_sssf_config/sssf.config.yaml` (name `researcher`, read-oriented tools: `read`, `grep`, `find`, `ls`, `bash` for running existing code, `write` scoped to the case directory; `writes: ["research/"]`).
-- New prompt pair `adws/adw_data/prompt_engineering/researcher/{system,user}.md`, following the scout's read-only pattern with an added evidence-pack envelope type.
-- New workflow script (e.g. `adws/adw_research.py`: request → research → review) reusing `agents.execute`, gates, and `ApprovalBook`. No new orchestrator.
-- The role already has a reserved Settings slot (`Researcher local/cloud` appears in the roster UI); wiring it is config + prompts, not framework work.
+The `rea` agent interprets an engine-generated evidence projection without
+tools. The engine writes rea_handoff.md and an identical specs copy after
+validating its typed interpretation. Gates require approved assignment identity, evidence-backed facts
+and inferences, explicit unknowns/limitations, behavioral requirements,
+validation cases, both handoff copies and unchanged raw evidence. Existing
+write permissions still check agent modifications; the REA interpreter and
+evidence planner have no filesystem or shell tools.
 
-## Why not now
+The tool-free evidence planner receives the validated ReaOutput and returns typed plan text. The engine persists both plan copies and validates source citations. The planner must use the handoff,
+requirements, cases and limitations. Plan Only describes an investigation and
+never runs collection or REA; ordinary workflows are unchanged. Full SDLC
+normally commits its plan, build and documentation only at the existing gated
+stages. This recovery did not run that live committing workflow.
 
-The first release needs the core journey solid. Research output without review
-discipline becomes a findings firehose (see F3). Revisit after planner costs
-are bounded and the review queue has dismissal mechanics.
+Real REA 6.7.0 verification succeeded on adws/adw_data/rea_synthetic: two
+modules, zero endpoints and thirteen explicitly reported unknowns. Raw evidence
+is in adws/adw_data/rea_verification/pinned. A real intentionally missing ASAR
+returned exit 1 and structured input_path ENOENT; both streams are retained in
+rea_verification/failure-complete. These checks use no model/provider calls.
+Agent interpretation and planner consumption have separate mocked regression
+coverage; a live model SDLC run is still unverified. See HANDOFF.md for exact
+checks, diagnostics, limits and the earlier session's unresolved request error.

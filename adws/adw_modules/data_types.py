@@ -31,6 +31,7 @@ class PhaseParams(BaseModel):
     @field_validator("description")
     @classmethod
     def _description_must_be_earned(cls, value: str, info: ValidationInfo) -> str:
+
         """A phase name identifies; a description explains. Both are required.
 
         The description is the only sentence the trace, the console, and the
@@ -125,6 +126,74 @@ class DocumentOutput(EnvelopeBase):
 
     document_path: str = ""         # the doc in the repo, e.g. app_docs/<adw_id>_<slug>.md
     documented_files: list[str] = Field(default_factory=list)
+    commit_message: str = ""
+
+
+class EvidencePlanOutput(PlanOutput):
+    """Planner text rendered by the engine; no model file-writing turns."""
+    plan_markdown: str
+
+
+class ReaFact(BaseModel):
+    """One observed REA finding with its traceable evidence.
+
+    An observation is a fact the investigation actually saw: tool output,
+    a file region, a trace edge. The evidence field is the pointer that lets
+    anyone re-verify it — never a bare assertion.
+    """
+
+    observation: str                 # what was seen, in the requester's words
+    evidence: str = ""               # where: tool output, file:line, trace edge
+
+
+class ReaInference(BaseModel):
+    """A conclusion drawn from facts, with the facts that support it.
+
+    Inferences are allowed, but they must name their support. An inference
+    with no evidence is a guess and fails the handoff gate.
+    """
+
+    claim: str                       # what is concluded
+    evidence: str = ""               # the facts supporting it
+
+
+class ReaEvidence(EnvelopeBase):
+    """Deterministic REA collection result, handed to the rea agent."""
+
+    ok: bool = False
+    question: str = ""
+    scope: str = ""
+    permitted_actions: str = ""
+    target: str = ""
+    kind: str = ""
+    command: list[str] = Field(default_factory=list)
+    evidence_path: str = ""
+    context_path: str = ""
+    module_count: int = 0
+    endpoints: list[str] = Field(default_factory=list)
+    unknown_count: int = 0
+    limitations: list[str] = Field(default_factory=list)
+    error: str = ""
+
+
+class ReaOutput(EnvelopeBase):
+    """The REA handoff: what an investigation found, and what it did not.
+
+    The planner and builder consume this envelope directly. Unknowns are
+    first-class content: an incomplete investigation must name its gaps, so
+    downstream agents plan around them instead of assuming answers.
+    """
+
+    question: str = ""               # the assigned investigation question
+    target: str = ""                 # app, files, or URL under investigation
+    scope: str = ""                  # what was in bounds for this investigation
+    permitted_actions: str = ""      # what the approval allowed (read-only bounds)
+    observed_facts: list[ReaFact] = Field(default_factory=list)
+    inferences: list[ReaInference] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)       # open questions, explicitly listed
+    limitations: list[str] = Field(default_factory=list)    # engines/tools unavailable, coverage gaps
+    behavioral_requirements: list[str] = Field(default_factory=list)  # must-hold behaviors for the build
+    validation_cases: list[str] = Field(default_factory=list)  # concrete checks the build must pass
     commit_message: str = ""
 
 
@@ -435,7 +504,7 @@ class UsageBreakdown(BaseModel):
 
     def merge(self, other: "UsageBreakdown") -> None:
         """Add another call's usage — a phase that retries spends more than once."""
-        for field in self.model_fields:
+        for field in self.model_fields.keys():
             setattr(self, field, getattr(self, field) + getattr(other, field))
 
 

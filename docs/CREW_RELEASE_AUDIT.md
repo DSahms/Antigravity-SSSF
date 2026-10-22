@@ -1,3 +1,5 @@
+> Historical record: this file describes an earlier implementation. Current product behavior and verification are in [CREW_IMPLEMENTATION_STATUS.md](CREW_IMPLEMENTATION_STATUS.md) and the latest [HANDOFF.md](HANDOFF.md). Preserve the history below; do not treat superseded findings as current.
+
 # CREW Platform — Release Readiness Audit
 
 **Date:** 2026-10-19  

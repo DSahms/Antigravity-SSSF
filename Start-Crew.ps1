@@ -2,6 +2,8 @@ $ErrorActionPreference = 'Stop'
 $crewRoot = $PSScriptRoot
 try {
     $crewBun = (Get-Command bun -ErrorAction Stop).Source
+    $crewMissing = @('node', 'git', 'uv', 'pi') | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }
+    if ($crewMissing.Count) { throw ('Missing workflow tools: ' + ($crewMissing -join ', ') + '. See docs/learners-manual/index.html -> Installation.') }
     # Pin the port the launcher and origin check share. A generic PORT=0 from
     # the parent shell used to make Bun bind a random port the browser never used.
     $env:STUDIO_PORT = '4620'

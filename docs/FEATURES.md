@@ -1,3 +1,5 @@
+> Historical record: this file describes an earlier implementation. Current product behavior and verification are in [CREW_IMPLEMENTATION_STATUS.md](CREW_IMPLEMENTATION_STATUS.md) and the latest [HANDOFF.md](HANDOFF.md). Preserve the history below; do not treat superseded findings as current.
+
 # CREW (SSSF Studio) — Feature Inventory
 
 > Step 0 baseline. Every user-facing feature, where it lives in the code, and how to exercise it. A missing feature at the end of this work is a bug, not a trade-off.

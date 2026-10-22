@@ -45,6 +45,7 @@ import argparse
 import sys
 
 from adw_modules import agents, changes, gates, git_helper, quality, session, utils
+from adw_modules import permissions
 from adw_modules.data_types import (AgentCall, BuildOutput, ChangeCapture,
                                     DocumentOutput, PhaseParams, PlanOutput,
                                     ReviewOutput)
@@ -58,11 +59,12 @@ DOCUMENT_NOTES = ("Read diff_path in full before writing. Document only what the
                   "describes.")
 
 
-def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None) -> int:
+def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None, *, commit_outputs: bool = True) -> int:
     cfg = agents.load_config(config)
     agents.validate(cfg, REQUIRED_AGENTS)
     run = session.ensure(cfg, adw_id)
     baseline = git_helper.rev("HEAD")     # pinned before this run commits anything
+    initial_tree = permissions.snapshot(run) if not commit_outputs else None
 
     def commit(ph, envelope) -> None:
         """Commit what the preceding phase produced, in that agent's own words."""
@@ -84,9 +86,10 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
         plan = ph.call(AgentCall(output_type=PlanOutput, prompt=prompt,
                                  gates=[gates.artifacts_exist, gates.files_non_empty]))
 
-    with run.phase(PhaseParams(name="commit_plan", kind="code", owner="git",
-                               description="Put the spec on record before any code exists to blur it")) as ph:
-        commit(ph, plan)
+    if commit_outputs:
+        with run.phase(PhaseParams(name="commit_plan", kind="code", owner="git",
+                                   description="Put the spec on record before any code exists to blur it")) as ph:
+            commit(ph, plan)
 
     with run.phase(PhaseParams(name="build", kind="agent", owner="builder",
                                description="Implement the plan exactly")) as ph:
@@ -98,7 +101,7 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
         with run.phase(PhaseParams(name=f"test_{i}", kind="code", owner="quality",
                                    description="Run the suite — a known command, so code runs "
                                                "it and no agent has to rediscover it")) as ph:
-            test = quality.run_tests(run)
+            test = quality.run_tests(run) if commit_outputs else quality.run_quality(run)
             record(ph, test)
 
         if test.passed:
@@ -134,7 +137,7 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
         with run.phase(PhaseParams(name="retest", kind="code", owner="quality",
                                    description="Re-run the suite — the revision changed code "
                                                "after the last green result")) as ph:
-            test = quality.run_tests(run)
+            test = quality.run_tests(run) if commit_outputs else quality.run_quality(run)
             record(ph, test)
 
     # Red tests or a rejected review stop the chain here: the code stays
@@ -143,13 +146,14 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
     verified = (test is not None and test.passed
                 and review is not None and review.approved)
     if verified:
-        with run.phase(PhaseParams(name="commit_build", kind="code", owner="git",
-                                   description="Land the code only now: green suite, approved review")) as ph:
-            commit(ph, build)
+        if commit_outputs:
+            with run.phase(PhaseParams(name="commit_build", kind="code", owner="git",
+                                       description="Land the code only now: green suite, approved review")) as ph:
+                commit(ph, build)
 
         with run.phase(PhaseParams(name="changes", kind="code", owner="git",
                                    description="Diff the whole run against its pinned baseline, for the documenter")) as ph:
-            changeset = changes.capture(run, ChangeCapture(base=baseline))
+            changeset = changes.capture_since(run, initial_tree) if initial_tree is not None else changes.capture(run, ChangeCapture(base=baseline))
             ph.log(base=f"{changeset.base.label} @ {changeset.base.commit[:7]}",
                    reason=changeset.base.reason,
                    files=len(changeset.files) + len(changeset.untracked),
@@ -166,9 +170,10 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
                                          previous=changes.as_envelope(changeset, DOCUMENT_NOTES),
                                          gates=[gates.artifacts_exist, gates.files_non_empty]))
 
-        with run.phase(PhaseParams(name="commit_docs", kind="code", owner="git",
-                                   description="Ship the write-up in its own commit, beside the code it describes")) as ph:
-            commit(ph, document)
+        if commit_outputs:
+            with run.phase(PhaseParams(name="commit_docs", kind="code", owner="git",
+                                       description="Ship the write-up in its own commit, beside the code it describes")) as ph:
+                commit(ph, document)
 
     return run.finish(accepted=verified,
                       reason="the suite or the review never came back clean")

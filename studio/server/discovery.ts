@@ -195,22 +195,29 @@ export class DiscoveryEngine {
       if (!profile) throw new Error("Save an interviewer connection in Settings first.");
       const headers: Record<string, string> = { "content-type": "application/json" };
       if (profile.apiKey && profile.apiKey !== "none") headers.authorization = `Bearer ${profile.apiKey}`;
-      const system = `You are C.R.E.W. Software's thoughtful software interviewer. Ask one useful question at a time, with up to three suggested answers. Draw out tacit knowledge, accessibility needs, priorities, constraints, and what success looks like. Be gentle and practical. Offer solutions to gaps; do not interrogate or silently invent answers. Preserve user statements and mark assumptions. Do not use tools or execute work. Return ONLY JSON: {"title":"short title","reply":"conversational response and next question if needed","ready":false,"questions":[{"question":"next necessary question","choices":["choice"]}],"specMarkdown":"# Title\\n\\n## Goal\\n...\\n\\n## Requirements\\n...\\n\\n## Acceptance Criteria\\n...\\n\\n## Boundaries\\n..."}. Mark ready true only when the goal, requirements, boundaries, and concrete acceptance checks are supplied, no required questions remain, and the user has been shown a summary. A user can explicitly scope a smaller deliverable. Final approval is always the user's choice. Current draft follows:\n${session.specMarkdown}`;
+      const system = `You are C.R.E.W. Software's thoughtful software interviewer. Ask one useful question at a time, with up to three suggested answers. Draw out tacit knowledge, accessibility needs, priorities, constraints, and what success looks like. Be gentle and practical. Offer solutions to gaps; do not interrogate or silently invent answers. Preserve user statements and mark assumptions. Do not use tools or execute work. If the request involves understanding, tracing, or migrating EXISTING software (a feature in another app, undocumented behavior, a legacy workflow), recommend an REA investigation in the spec: add an Investigation section naming the question, the target, and the permitted read-only actions, including a fenced crew-rea JSON block with nonempty string fields question, target (absolute local JavaScript directory or ASAR), scope (static inspection of only that target), and permitted_actions set to static-local, and note that the owner should pick the "Investigate, Then Build" workflow at review — but keep investigating out of this interview; you describe, you never execute. Return ONLY JSON: {"title":"short title","reply":"conversational response and next question if needed","ready":false,"questions":[{"question":"next necessary question","choices":["choice"]}],"specMarkdown":"# Title\\n\\n## Goal\\n...\\n\\n## Requirements\\n...\\n\\n## Acceptance Criteria\\n...\\n\\n## Boundaries\\n..."}. Mark ready true only when the goal, requirements, boundaries, and concrete acceptance checks are supplied, no required questions remain, and the user has been shown a summary. A user can explicitly scope a smaller deliverable. Final approval is always the user's choice. Current draft follows:\n${session.specMarkdown}`;
       const messages = [{ role: "system", content: system }, ...session.chatHistory.slice(-24).map(m => ({ role: m.role, content: m.content }))];
       const ask = async (extra: Array<{ role: string; content: string }>) => {
         const res = await fetch(profile.baseUrl.replace(/\/+$/, "") + "/chat/completions", {
           method: "POST", headers, signal: AbortSignal.timeout(120000),
           body: JSON.stringify({ model: profile.model, messages: [...messages, ...extra], max_tokens: 4096 }),
         });
-        if (!res.ok) throw new Error(`Interviewer connection returned HTTP ${res.status}. Check Settings → Test connection.`);
+        if (!res.ok) {
+          let detail = (await res.text()).slice(0, 2000);
+          if (profile.apiKey) detail = detail.split(profile.apiKey).join("[REDACTED]");
+          detail = detail.replace(/sk-[A-Za-z0-9_-]+/g, "[REDACTED]").replace(/Bearer\s+[^\s"']+/gi, "Bearer [REDACTED]");
+          writeFileSync(join(this.targetDir, ".sssf", "interviewer-diagnostic.json"), JSON.stringify({ operation: "chat/completions", status: res.status, diagnostic: detail }, null, 2));
+          throw new Error(`Interviewer connection returned HTTP ${res.status}: ${detail || 'no diagnostic supplied'}. Check Settings → Test connection.`);
+        }
         const data = await res.json() as any;
         const text = data?.choices?.[0]?.message?.content;
         if (typeof text !== "string") throw new Error("The interviewer returned no usable response.");
         return text;
       };
       let result: any;
+      const firstReply = await ask([]);
       try {
-        result = parseInterviewerJson(await ask([]));
+        result = parseInterviewerJson(firstReply);
       } catch {
         // One bounded retry: small models sometimes narrate first. Nudge once
         // for JSON-only; if it still fails, the gentle error below stands.
@@ -228,6 +235,9 @@ export class DiscoveryEngine {
           .slice(0, 3);
         return [{ id: `question-${Date.now()}-${i}`, question: text, choices, answered: false }];
       });
+      // Small models sometimes use Overview for the requested Goal heading.
+      // Preserve its text while normalizing this known synonym; do not invent content.
+      if (!/^## Goal\s*$/m.test(result.specMarkdown)) result.specMarkdown = result.specMarkdown.replace(/^## Overview\s*$/m, "## Goal");
       session.title = result.title;
       session.specMarkdown = result.specMarkdown;
       session.analysis = { summary: result.reply, missingRequirements: [], ambiguities: [], suggestions: [], risks: [], openQuestions: questions };

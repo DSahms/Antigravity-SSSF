@@ -138,6 +138,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
         def observe(event: dict) -> None:
             forwarder(event)
             if event.get("type") == "message_end" and event.get("message", {}).get("role") == "assistant":
+                run.check_token_cap()
                 # Engine-owned spend ceiling: trips mid-turn, kills the child
                 # via agent_pi's BaseException path, fails the phase cleanly.
                 track_budget(event["message"].get("usage", {}) or {})

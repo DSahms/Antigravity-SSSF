@@ -9,6 +9,7 @@ require a parsed envelope + green gates, enforced inside ph.call).
 from __future__ import annotations
 
 import json
+import os
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -51,7 +52,7 @@ class Run:
         self.cost = 0.0
         self._seq = tracer.max_phase_seq(adw_id)   # a joined run continues the sequence
         self.repo_root = git_helper.repo_root()    # where every agent is spawned to work
-        self.session_dir = ensure_dir(Path(cfg.defaults.data_dir) / "sessions" / adw_id)
+        self.session_dir = ensure_dir((Path(cfg.defaults.data_dir) / "sessions" / adw_id).resolve())
         self.context_handoff_dir = ensure_dir(self.session_dir / "context_handoff")
         self._agent_map_path = self.session_dir / "agent_map.json"
         self.agent_map: dict = (json.loads(self._agent_map_path.read_text())
@@ -67,6 +68,17 @@ class Run:
         self.tokens += tokens
         self.cost += cost
         self.tracer.session_add_usage(self.adw_id, tokens, cost)
+
+    def check_token_cap(self) -> None:
+        """Read the persisted cumulative usage after turns and before new phases."""
+        cap = int(os.environ.get("CREW_TOKEN_CAP", "0"))
+        if cap <= 0:
+            return
+        row = self.tracer.conn.execute(
+            "SELECT COALESCE(SUM(tokens),0) FROM events WHERE adw_id=? AND type='usage'",
+            (self.adw_id,)).fetchone()
+        if row[0] >= cap:
+            raise RuntimeError(f"Run token reporting cap reached ({row[0]:,} / {cap:,}); no further phase may start")
 
     # ── the phase primitive ─────────────────────────────────────────────────
     @contextmanager
@@ -84,6 +96,7 @@ class Run:
         self.console.phase_started(phase)
         clock = time.monotonic()
         try:
+            self.check_token_cap()
             yield PhaseHandle(self, phase)
         except BaseException as error:
             phase.status = "fail"                      # success must be earned

@@ -98,6 +98,40 @@ def verdict_consistent(envelope: EnvelopeBase, run) -> GateReport:
     return report
 
 
+def rea_handoff_complete(envelope: EnvelopeBase, run) -> GateReport:
+    """An REA handoff must be complete to be consumable — never a silent gap.
+
+    Facts are the payload: at least one observed fact with evidence, or the
+    investigation found nothing to report and says so nowhere — which fails.
+    Every inference must name its supporting evidence; unknowns and
+    limitations must be present as explicit lists (they may be empty only if
+    the agent truly has none, which the fields still record). A failed or
+    partial investigation must arrive as status "fail", never as a clean
+    handoff with empty hands.
+    """
+    report = GateReport()
+    facts = list(getattr(envelope, "observed_facts", []) or [])
+    report.check("handoff has observed facts",
+                 len(facts) > 0,
+                 f"{len(facts)} fact(s) with evidence" if facts else "no observed facts recorded")
+    for i, f in enumerate(facts):
+        ok = bool(getattr(f, "observation", "").strip() and getattr(f, "evidence", "").strip())
+        report.check(f"fact {i + 1} has observation and evidence", ok,
+                     "traceable" if ok else "observation without evidence is not a fact")
+    inferences = list(getattr(envelope, "inferences", []) or [])
+    for i, inf in enumerate(inferences):
+        ok = bool(getattr(inf, "claim", "").strip() and getattr(inf, "evidence", "").strip())
+        report.check(f"inference {i + 1} names its evidence", ok,
+                     "supported" if ok else "inference without evidence is a guess")
+    report.check("unknowns recorded",
+                 isinstance(getattr(envelope, "unknowns", None), list),
+                 "open questions listed explicitly, none hidden")
+    report.check("limitations recorded",
+                 isinstance(getattr(envelope, "limitations", None), list),
+                 "coverage gaps and unavailable engines listed explicitly")
+    return report
+
+
 def tests_pass(command: str):
     """Gate factory: the given shell command must exit 0."""
     def gate(envelope: EnvelopeBase, run) -> GateReport:

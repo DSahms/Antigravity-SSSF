@@ -9,6 +9,7 @@ continuing an agent are the same call: same session id = same context window.
 from __future__ import annotations
 
 import json
+import re
 import os
 import subprocess
 import time
@@ -248,14 +249,17 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
         cmd += ["--no-tools"]
     for extension in request.extensions:
         cmd += ["-e", extension]
-    cmd.append(request.prompt)
-
     raw_path = Path(request.raw_output_path)
     raw_path.parent.mkdir(parents=True, exist_ok=True)
+    # Pi's documented @file input avoids Windows' 32K command-line limit.
+    # Keep DEVNULL stdin so there is no pipe waiting for an EOF that never comes.
+    prompt_path = raw_path.with_name("invocation-prompt.md").resolve()
+    prompt_path.write_text(request.prompt, encoding="utf-8")
+    cmd.append("@" + str(prompt_path))
 
     result = PiResult(session_id=request.session_id,
                       context_window=context_window(provider, model_id))
-    # stdin is DEVNULL, deliberately. The prompt travels in argv, so the child
+    # stdin is DEVNULL, deliberately. The prompt file travels in argv, so the child
     # never needs stdin — but inheriting the parent's means pi sees a non-TTY
     # and can sit forever waiting for piped input that will never arrive or
     # EOF. That failure is silent and total: no request goes out, no bytes come
@@ -266,6 +270,7 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
                                text=True, encoding="utf-8", errors="replace", bufsize=1, cwd=request.cwd,
                                env=operator_env())
     stderr_chunks = deque(maxlen=256)
+    provider_error = ""
     def drain_stderr():
         if process.stderr:
             for chunk in iter(lambda: process.stderr.read(4096), ""):
@@ -289,6 +294,8 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
             if event.get("type") == "message_end":
                 message = event.get("message", {})
                 if message.get("role") == "assistant":
+                    if message.get("stopReason") == "error":
+                        provider_error = str(message.get("errorMessage") or "assistant request failed without provider diagnostic")
                     text = _text_of(message)
                     if text:
                         result.text = text   # last assistant message wins
@@ -322,4 +329,9 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
         on_exit(process.pid)
     if result.returncode != 0:
         raise RuntimeError(f"pi exited {result.returncode}: {stderr.strip()[-800:]}")
+    if provider_error:
+        # A rejected HTTP/model request is not malformed model JSON. Abort so
+        # the envelope parser cannot repeat the identical failing request.
+        safe = re.sub(r"sk-[A-Za-z0-9_-]+|Bearer\s+[^\s\"']+", "[REDACTED]", provider_error)
+        raise RuntimeError(f"Pi model request rejected: {safe[-1600:]}; raw event retained in {raw_path}")
     return result

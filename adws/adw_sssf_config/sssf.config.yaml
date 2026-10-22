@@ -73,6 +73,15 @@ agents:
       - subagent_continue
       - subagent_list
       - subagent_remove
+  - name: rea
+    color: "#a3e635"
+    purpose: Interpret engine-collected REA evidence and write the handoff; no independent investigation.
+    max_tokens: 60000
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/rea/system.md
+      user: adws/adw_data/prompt_engineering/rea/user.md
+    writes: []
+    tools: []
   - name: reviewer
     model: openai/gpt-5.6-terra
     thinking: high

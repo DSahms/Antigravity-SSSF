@@ -21,6 +21,9 @@ import { prepareRuntime } from "./runtime.ts";
 
 const QUALITY_WORKFLOWS = new Set([
   "adw_simple_sdlc.py",
+  "adw_simple_sdlc_rea.py",
+  "adw_verify_sdlc.py",
+  "adw_plan_build_test_quality.py",
   "adw_plan_build_test.py",
   "adw_build_test.py",
   "adw_quality.py",
@@ -37,6 +40,20 @@ const WORKFLOW_METADATA: Record<
     badge?: string;
   }
 > = {
+  "adw_rea_plan.py": {
+    name: "Investigate & Plan Only",
+    description: "Collect real static REA evidence, interpret it, and write a plan. No build or commits.",
+    phases: ["request", "rea_collect", "rea", "plan"],
+    requiredAgents: ["rea", "planner"],
+    recommendedWhen: "Verify an approved investigation and its plan before authorizing a build.",
+  },
+  "adw_verify_sdlc.py": {
+    name: "Build, Verify & Document Without Commits",
+    description: "Plan, build, test, review and document in an isolated project. Leaves all outputs uncommitted.",
+    phases: ["request", "plan", "build", "test", "review", "changes", "document"],
+    requiredAgents: ["planner", "builder", "reviewer", "documenter"],
+    recommendedWhen: "Acceptance verification where the operator must review outputs before any commit.",
+  },
   "adw_simple_sdlc.py": {
     name: "Build, Check, Review & Document",
     description: "The complete pipeline: plan → build → test → review → document, landing 3 agent commits.",
@@ -44,6 +61,14 @@ const WORKFLOW_METADATA: Record<
     requiredAgents: ["planner", "builder", "reviewer", "documenter"],
     recommendedWhen: "When building real features from an approved specification. Expect a long, token-heavy run.",
     badge: "Full build",
+  },
+  "adw_simple_sdlc_rea.py": {
+    name: "Investigate, Then Build",
+    description: "REA investigates existing software first (evidence-backed handoff), then the full pipeline: plan → build → test → review → document.",
+    phases: ["request", "rea_collect", "rea", "plan", "commit_plan", "build", "test", "review", "document", "commit_docs"],
+    requiredAgents: ["rea", "planner", "builder", "reviewer", "documenter"],
+    recommendedWhen: "When the job depends on understanding existing software, tracing a feature, or migrating legacy behavior. Reads only — REA changes nothing.",
+    badge: "Investigate first",
   },
   "adw_build.py": {
     name: "Build Once",
@@ -167,8 +192,8 @@ export class WorkflowLauncher {
 
   /** Mark runs that died with the server as failed, so nothing shows
    * "running" forever. A session left in `running` with no live child process
-   * belongs to a previous server lifetime — this server owns no children for
-   * it yet (childProcesses starts empty), so reconciling here is always safe.
+   * may also belong to a standalone engine or another server. Check its
+   * recorded engine PID before changing its state; never stop that process.
    * Open phases/processes close with the reason recorded. */
   private reconcileInterruptedRuns(): void {
     const dbPath = join(this.targetDir, "adws", "adw_data", "sssf.db");
@@ -180,9 +205,19 @@ export class WorkflowLauncher {
       const endedAt = new Date().toISOString();
       const reason = "server restarted while this run was active; no live process";
       db.transaction(() => {
-        db!.query("UPDATE sessions SET status='fail', ended_at=?, total_tokens=COALESCE(total_tokens,0) WHERE status='running'").run(endedAt);
-        db!.query("UPDATE phases SET status='fail', ended_at=?, error=? WHERE ended_at IS NULL AND status='running'").run(endedAt, reason);
-        db!.query("UPDATE processes SET ended_at=? WHERE ended_at IS NULL").run(endedAt);
+        const pending = db!.query("SELECT adw_id FROM sessions WHERE status='running'").all() as {adw_id: string}[];
+        for (const { adw_id } of pending) {
+          const engine = db!.query("SELECT pid FROM processes WHERE adw_id=? AND kind='adw' AND ended_at IS NULL ORDER BY id DESC LIMIT 1").get(adw_id) as {pid: number} | null;
+          if (engine?.pid) {
+            try { process.kill(engine.pid, 0); continue; } catch (error: any) {
+              // Access denied cannot establish death. Preserve ambiguous state.
+              if (error?.code !== "ESRCH") continue;
+            }
+          }
+          db!.query("UPDATE sessions SET status='fail', ended_at=? WHERE adw_id=?").run(endedAt, adw_id);
+          db!.query("UPDATE phases SET status='fail', ended_at=?, error=? WHERE adw_id=? AND ended_at IS NULL AND status='running'").run(endedAt, reason, adw_id);
+          db!.query("UPDATE processes SET ended_at=? WHERE adw_id=? AND ended_at IS NULL").run(endedAt, adw_id);
+        }
       })();
     } catch {
       // A locked or missing trace db must never block startup.
@@ -247,9 +282,17 @@ export class WorkflowLauncher {
     if (QUALITY_WORKFLOWS.has(req.workflowId) && !existsSync(join(this.targetDir, ".crew-quality.json"))) {
       throw new Error("This workflow runs deterministic checks, but this project has no .crew-quality.json. Open Settings → Project checks, add the real test/lint/typecheck/build commands, then run again.");
     }
+    if (QUALITY_WORKFLOWS.has(req.workflowId)) {
+      let checks: any;
+      try { checks = JSON.parse(readFileSync(join(this.targetDir, ".crew-quality.json"), "utf8")); }
+      catch { throw new Error("Project checks are not valid JSON. Open Settings → Project checks and save valid commands."); }
+      const requiredChecks = ["adw_quality.py", "adw_plan_build_test_quality.py", "adw_verify_sdlc.py"].includes(req.workflowId) ? ["test", "lint", "typecheck", "build"] : ["test"];
+      const missing = requiredChecks.filter(key => !Array.isArray(checks?.[key]) || !checks[key].length || !checks[key].every((arg: unknown) => typeof arg === "string" && arg.trim()));
+      if (missing.length) throw new Error(`Configure real ${missing.join(", ")} commands in Settings → Project checks before running this workflow.`);
+    }
     const gitStatus = Bun.spawnSync(["git", "status", "--porcelain"], { cwd: this.targetDir });
     if (gitStatus.exitCode !== 0) throw new Error("Choose a prepared app project with Git history.");
-    if (req.workflowId !== "adw_scout.py" && req.workflowId !== "adw_quality.py" && gitStatus.stdout.toString().trim()) throw new Error("This project has uncommitted work. Review and save it before starting agents, or create a separate app project.");
+    if (!["adw_scout.py", "adw_quality.py", "adw_rea_plan.py", "adw_verify_sdlc.py"].includes(req.workflowId) && gitStatus.stdout.toString().trim()) throw new Error("This project has uncommitted work. Review and save it before starting agents, or create a separate app project.");
     // ───────────────────────────────────────────────────────────────────
 
     const scriptPath = join("adws", req.workflowId);
@@ -309,6 +352,7 @@ export class WorkflowLauncher {
           PYTHONIOENCODING: "utf-8",
           PYTHONUTF8: "1",
           ...runtime.env,
+          CREW_TOKEN_CAP: String(tokenCap),
         },
         stdout: "pipe",
         stderr: "pipe",

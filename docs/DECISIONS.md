@@ -1,3 +1,5 @@
+> Historical record: this file describes an earlier implementation. Current product behavior and verification are in [CREW_IMPLEMENTATION_STATUS.md](CREW_IMPLEMENTATION_STATUS.md) and the latest [HANDOFF.md](HANDOFF.md). Preserve the history below; do not treat superseded findings as current.
+
 # DECISIONS.md — Design & Architecture Choices
 
 One or two lines each. Logged as we go, per the mission's working protocol.

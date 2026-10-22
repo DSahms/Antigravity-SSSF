@@ -22,7 +22,7 @@ const approving = ref(false);
 
 // Per-section checkmarks (computed from the spec's markdown sections)
 const sectionChecks = ref<Record<string, boolean>>({});
-const QUALITY_WORKFLOWS = new Set(["adw_simple_sdlc.py", "adw_plan_build_test.py", "adw_build_test.py", "adw_quality.py"]);
+const QUALITY_WORKFLOWS = new Set(["adw_simple_sdlc.py", "adw_simple_sdlc_rea.py", "adw_verify_sdlc.py", "adw_plan_build_test_quality.py", "adw_plan_build_test.py", "adw_build_test.py", "adw_quality.py"]);
 
 // Summary text (user can edit but doesn't have to)
 const summary = ref({

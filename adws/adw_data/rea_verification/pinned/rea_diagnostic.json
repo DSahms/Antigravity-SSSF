@@ -1,0 +1,12 @@
+{
+  "command": [
+    "C:\\Users\\david\\AppData\\Local\\hermes\\node\\npx.CMD",
+    "-y",
+    "rea-agents@6.7.0",
+    "analyze-javascript-application",
+    "adws/adw_data/rea_synthetic",
+    "--json"
+  ],
+  "returncode": 0,
+  "diagnostic": "success"
+}

@@ -17,8 +17,8 @@ import type {
   TestConnectionResponse,
 } from "../shared/types.ts";
 
-const DEFAULT_LOCAL_URL = "http://127.0.0.1:5001/v1";
-const DEFAULT_LOCAL_MODEL = "koboldcpp/default";
+const DEFAULT_LOCAL_URL = "http://127.0.0.1:31415/v1";
+const DEFAULT_LOCAL_MODEL = "auto";
 const DEFAULT_TOKEN_CAP = 20_000;
 
 const KNOWN_ROLES: { role: string; label: string }[] = [
@@ -33,6 +33,7 @@ const KNOWN_ROLES: { role: string; label: string }[] = [
   { role: "specialist", label: "Specialist" },
   { role: "validator", label: "Validator" },
   { role: "scrutiny", label: "Scrutiny" },
+  { role: "rea", label: "REA Investigator" },
 ];
 
 export class ProfileStore {
@@ -64,8 +65,27 @@ export class ProfileStore {
       this.state = null;
     }
     if (!this.state) this.state = this.seedDefaults();
+    this.mergeMissingRoles();
     // Always ensure cloud profiles are disabled if no key present.
     this.syncCloudDisabled();
+  }
+
+  /** Add seeded entries for roles introduced after a profiles file was first
+   * written. Existing saved connections are never touched — only missing
+   * (role, provider) pairs are appended, then persisted. */
+  private mergeMissingRoles() {
+    if (!this.state) return;
+    const fresh = this.seedDefaults();
+    const have = new Set(this.state.profiles.map(p => `${p.role}:${p.provider}`));
+    let added = false;
+    for (const p of fresh.profiles) {
+      if (!have.has(`${p.role}:${p.provider}`)) {
+        const savedLocal = p.provider === "local" ? this.state.profiles.find(existing => existing.role === "planner" && existing.provider === "local" && !existing.disabled) : undefined;
+        this.state.profiles.push(savedLocal ? { ...savedLocal, role: p.role, label: p.label } : { ...p });
+        added = true;
+      }
+    }
+    if (added) this.persist();
   }
 
   private persist() {

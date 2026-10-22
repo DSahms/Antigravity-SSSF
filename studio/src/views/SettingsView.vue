@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { parseArgv } from "@shared/command-argv";
 import { computed, onMounted, ref } from "vue";
 import {
   AlertCircle, CheckCircle2, Clipboard, Eye, EyeOff, Key, ListChecks, Plug,
@@ -42,7 +43,7 @@ const qualitySaved = ref(false);
 
 function fillQuality(state: ProjectQualityState) {
   for (const field of QUALITY_FIELDS) {
-    qualityDraft.value[field.key] = (state.config?.[field.key] ?? []).join(" ");
+    qualityDraft.value[field.key] = state.config?.[field.key]?.length ? JSON.stringify(state.config[field.key]) : "";
   }
 }
 
@@ -174,33 +175,6 @@ async function handleSaveCap() {
   try {
     store.value = await setDefaultTokenCap(store.value.defaultTokenCap);
   } catch (e: any) { alert(e.message); }
-}
-
-/** Split a typed command into argv, honoring simple single/double quotes. */
-function parseArgv(input: string): string[] {
-  const out: string[] = [];
-  let current = "";
-  let quote: string | null = null;
-  let escaped = false;
-  for (const ch of input.trim()) {
-    if (escaped) { current += ch; escaped = false; continue; }
-    if (ch === "\\") { escaped = true; continue; }
-    if (quote) {
-      if (ch === quote) quote = null;
-      else current += ch;
-      continue;
-    }
-    if (ch === '"' || ch === "'") { quote = ch; continue; }
-    if (/\s/.test(ch)) {
-      if (current) { out.push(current); current = ""; }
-      continue;
-    }
-    current += ch;
-  }
-  if (escaped) current += "\\";
-  if (quote) throw new Error("Close the quote in that command before saving.");
-  if (current) out.push(current);
-  return out;
 }
 
 async function handleSaveQuality() {
@@ -371,11 +345,11 @@ const REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "m
           Every new run starts with this cap. When usage reaches the cap, the run stops with a calm plain-language message. Default low so a runaway job can't drain your wallet.
         </p>
         <div class="field-row">
-          <input type="number" v-model.number="store.defaultTokenCap" min="0" step="1000" />
+          <input type="number" v-model.number="store.defaultTokenCap" min="1" step="1000" />
           <button class="btn btn-primary" @click="handleSaveCap"><Save :size="14" /> Save</button>
         </div>
         <div class="dim" style="font-size: 12px; margin-top: 6px;">
-          Current: {{ store.defaultTokenCap.toLocaleString() }} tokens. Set 0 to disable the cap (not recommended).
+          Current: {{ store.defaultTokenCap.toLocaleString() }} tokens. Choose a positive whole number; reporting may overshoot by a turn.
         </div>
       </div>
     </div>
@@ -415,7 +389,7 @@ const REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "m
             :placeholder="field.placeholder"
             spellcheck="false"
           />
-          <div class="dim" style="font-size: 11.5px; margin-top: 3px;">One command, split into arguments. Leave blank to omit this check.</div>
+          <div class="dim" style="font-size: 11.5px; margin-top: 3px;">Paste a command (quote paths with spaces) or keep the saved argument list. Backslashes are preserved.</div>
         </div>
 
         <div class="action-row">

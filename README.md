@@ -38,7 +38,7 @@ without the customer's explicit approval of the specification.
 
 ## Current verification boundary
 
-The UI, controls, permissions, and simulated-agent workflow have passed checks. A live router run reached planning and was stopped by its reporting cap. A complete real generated product is not yet verified. Reporting caps can overshoot when a turn reports usage in a batch. Other industry verticals remain planned.
+See [implementation status](docs/CREW_IMPLEMENTATION_STATUS.md) and the latest [handoff](docs/HANDOFF.md) for current product-wide acceptance. Real CLI checks, browser checks, mocked tests and live model runs are reported separately. Reporting caps can overshoot when a turn reports usage in a batch. Other industry verticals remain planned.
 
 ## Provenance
 

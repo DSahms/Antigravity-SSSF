@@ -77,6 +77,23 @@ describe("case and credential isolation", () => {
   });
 });
 
+test("provider rejection records sanitized diagnostics and is not retried", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "crew-provider-error-"));
+  let calls = 0;
+  const stub = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch() { calls++; return Response.json({ error: "invalid parameters sk-secretvalue" }, { status: 400 }); } });
+  try {
+    const store = new ProfileStore(dir);
+    store.upsert({ ...store.list().profiles.find(p => p.role === "interviewer")!, baseUrl: `http://127.0.0.1:${stub.port}/v1`, apiKey: "sk-secretvalue" });
+    const engine = new DiscoveryEngine(dir);
+    await expect(engine.analyzeDescription("Synthetic input")).rejects.toThrow("HTTP 400");
+    expect(calls).toBe(1);
+    const diagnostic = readFileSync(join(dir, ".sssf/interviewer-diagnostic.json"), "utf8");
+    expect(diagnostic).toContain("invalid parameters");
+    expect(diagnostic).not.toContain("sk-secretvalue");
+    expect(new DiscoveryEngine(dir).getCurrentSession().rawInput).toBe("Synthetic input");
+  } finally { stub.stop(true); }
+});
+
 test("real interview transport preserves auto, readiness, and saved progress", async () => {
   let model = "";
   const mock = Bun.serve({ port: 0, hostname: "127.0.0.1", async fetch(req) {
@@ -120,6 +137,19 @@ describe("HTTP boundary", () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/studio/launch`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ workflowId: "../../unsafe.py" }) });
     expect(res.ok).toBe(false);
   });
+});
+
+test("restart reconciliation preserves a live engine and closes only stale runs", () => {
+  const dir = mkdtempSync(join(tmpdir(), "crew-restart-"));
+  mkdirSync(join(dir, "adws/adw_data"), { recursive: true });
+  const db = new Database(join(dir, "adws/adw_data/sssf.db"));
+  try {
+    db.exec("CREATE TABLE sessions(adw_id TEXT,status TEXT,ended_at TEXT); CREATE TABLE phases(adw_id TEXT,status TEXT,ended_at TEXT,error TEXT); CREATE TABLE processes(id INTEGER PRIMARY KEY,adw_id TEXT,kind TEXT,pid INTEGER,ended_at TEXT); INSERT INTO sessions VALUES('live','running',NULL),('stale','running',NULL); INSERT INTO phases VALUES('live','running',NULL,NULL),('stale','running',NULL,NULL);");
+    db.query("INSERT INTO processes(adw_id,kind,pid) VALUES('live','adw',?)").run(process.pid);
+    new WorkflowLauncher(dir, new ApprovalBook(dir));
+    expect((db.query("SELECT status FROM sessions WHERE adw_id='live'").get() as any).status).toBe("running");
+    expect((db.query("SELECT status FROM sessions WHERE adw_id='stale'").get() as any).status).toBe("fail");
+  } finally { db.close(); }
 });
 
 test("Stop terminates a workflow and its child while preserving stopped status", async () => {

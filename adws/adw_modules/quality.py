@@ -1,31 +1,8 @@
-"""Deterministic lint, typecheck, build, and test blocks.
+"""Deterministic project checks from .crew-quality.json.
 
-A known command is not a judgement call. Anything whose invocation you can write
-down belongs here as code — it runs in milliseconds, costs nothing, and returns
-the same answer every time. Agents are for the parts that need reading and
-deciding.
-
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  REPLACE THE PLACEHOLDER COMMANDS BELOW.                                     ║
-║                                                                              ║
-║  Every block ships as an `echo` that exits 0 and announces it is fake. They   ║
-║  are placeholders on purpose: a stamped repo has no way to guess your test    ║
-║  runner, and a wrong-but-plausible command that silently passes is worse      ║
-║  than one that says so out loud.                                             ║
-║                                                                              ║
-║  For each block you want: swap `_placeholder(...)` for the real argv, e.g.    ║
-║      argv=["bun", "test", "apps/web/server.test.ts"]                         ║
-║      argv=["uv", "run", "pytest", "-q"]                                      ║
-║      argv=["npm", "run", "lint"]                                             ║
-║  Delete the blocks you don't need, and drop them from run_quality()'s list.   ║
-║                                                                              ║
-║  Two rules when you write the real command:                                  ║
-║    1. argv LIST, never a shell string — no quoting bugs, no shell injection.  ║
-║    2. Call binaries by BARE NAME. These blocks inherit the operator's         ║
-║       environment (see utils.operator_env), so `bun`, `uv`, `pytest` resolve  ║
-║       exactly as they do in their terminal. Never hard-code an absolute path  ║
-║       like /Users/you/.bun/bin/bun — that bakes your machine into the trace.  ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+Commands use argv lists and the operator environment, never shell expansion.
+Missing checks fail explicitly. Every invocation persists output and a gate
+record; agent summaries cannot substitute for command exit status.
 """
 
 from __future__ import annotations
@@ -37,7 +14,7 @@ import json
 from pathlib import Path
 from typing import Callable
 
-from .data_types import (EventRecord, QualityCheckResult, QualityCheckSpec, QualityResult,
+from .data_types import (EventRecord, GateReport, QualityCheckResult, QualityCheckSpec, QualityResult,
                          VerifyOutput)
 from .utils import now_iso, operator_env
 
@@ -130,6 +107,9 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
         started_at=started_at,
         ended_at=now_iso(),
     ))
+    report = GateReport()
+    report.check(spec.name, passed, f"{command}: exit {returncode}; evidence {output_artifact}")
+    run.tracer.gate_row(phase, f"quality:{spec.name}", report, 1)
     run.console.note(
         f"quality {spec.name}: {'passed' if passed else 'failed'} "
         f"(exit {returncode}, {duration:.1f}s)"
@@ -148,7 +128,7 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
 
 
 # ── Blocks ────────────────────────────────────────────────────────────────────
-# Replace every argv below. See the banner at the top of this file.
+# Each block requires its named project-specific command.
 
 def test(run) -> QualityCheckResult:
     """Run the project's test suite. The highest-value block to wire up first."""

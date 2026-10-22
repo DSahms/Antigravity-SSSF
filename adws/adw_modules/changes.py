@@ -14,8 +14,11 @@ measured against.
 """
 
 from __future__ import annotations
+import difflib
+from pathlib import Path
 
 from . import git_helper
+from . import permissions
 from .data_types import BaseRef, ChangeCapture, ChangeSet, ChangesOutput
 
 DIFF_FILENAME = "changes.diff"
@@ -83,6 +86,27 @@ def capture(run, params: ChangeCapture) -> ChangeSet:
     return ChangeSet(base=base, files=files, untracked=untracked,
                      insertions=insertions, deletions=deletions, stat=stat,
                      diff_path=str(diff_path), truncated=truncated)
+
+
+def capture_since(run, before) -> ChangeSet:
+    """Document only this noncommitting run, preserving pre-existing dirty inputs."""
+    after = permissions.snapshot(run)
+    paths = permissions.changed_paths(before, after)
+    diff = []
+    inserted = deleted = 0
+    for name in paths:
+        old = before.contents.get(name, b"").decode("utf-8", errors="replace").splitlines(keepends=True)
+        file = Path(run.repo_root) / name
+        new = file.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True) if file.is_file() else []
+        lines = list(difflib.unified_diff(old, new, fromfile="a/" + name, tofile="b/" + name))
+        inserted += sum(line.startswith("+") and not line.startswith("+++") for line in lines)
+        deleted += sum(line.startswith("-") and not line.startswith("---") for line in lines)
+        diff.extend(lines)
+    path = run.context_handoff_dir / DIFF_FILENAME
+    path.write_text("# Changes produced by this run; pre-existing working changes excluded\n\n" + "".join(diff), encoding="utf-8")
+    return ChangeSet(base=BaseRef(ref="HEAD", commit=git_helper.rev("HEAD"), reason="run-start content snapshot; no commits"),
+                     files=paths, untracked=[], insertions=inserted, deletions=deleted,
+                     stat=f"{len(paths)} files changed by this run", diff_path=str(path), truncated=False)
 
 
 def as_envelope(changes: ChangeSet, notes: str = "") -> ChangesOutput:

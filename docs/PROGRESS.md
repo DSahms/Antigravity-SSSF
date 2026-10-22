@@ -1,3 +1,5 @@
+> Historical record: this file describes an earlier implementation. Current product behavior and verification are in [CREW_IMPLEMENTATION_STATUS.md](CREW_IMPLEMENTATION_STATUS.md) and the latest [HANDOFF.md](HANDOFF.md). Preserve the history below; do not treat superseded findings as current.
+
 # PROGRESS.md
 
 **NEXT ACTION FOR DAVE**: Nothing required from you to ship this pass. To run for real: (1) start a KoboldCpp server at `127.0.0.1:5001`; (2) open CREW Studio (`just studio`); (3) in Settings → Connection profiles, hit "Fetch models" against the local profile to populate the model dropdown from your running KoboldCpp, then "Test connection" to confirm; (4) try the Pi harness on your machine per `docs/PI-HARNESS.md` (we couldn't try it here — no `pi` binary in the sandbox); (5) walk the main path: New Job → Continue → Review & Approve → Approve → Run → watch the token guard. If you'd push back on any wording, `docs/DECISIONS.md` has the rationale per choice.

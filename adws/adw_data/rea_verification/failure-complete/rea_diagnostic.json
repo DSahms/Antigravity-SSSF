@@ -1,0 +1,12 @@
+{
+  "command": [
+    "C:\\Users\\david\\AppData\\Local\\hermes\\node\\npx.CMD",
+    "-y",
+    "rea-agents@6.7.0",
+    "analyze-javascript-application",
+    "adws/adw_data/rea_synthetic/intentionally-missing.asar",
+    "--json"
+  ],
+  "returncode": 1,
+  "diagnostic": "stderr:\nnpm notice run npx\nnpm notice run rea analyze-javascript-application adws/adw_data/rea_synthetic/intentionally-missing.asar --json\n{\"rea_progress\":{\"phase\":\"analyze_javascript_application\",\"completed\":0,\"total\":1,\"message\":\"Inventorying and parsing application artifacts\",\"sequence\":1}}\n\nstdout:\n{\"error\":\"JavaScript application analysis failed\",\"code\":\"invalid_request\",\"category\":\"invalid_input\",\"message\":\"Analysis input is invalid. Check the arguments and try again.\",\"retryable\":true,\"remediation\":{\"action\":\"Correct the listed arguments and retry.\"},\"details\":{\"operation\":\"analyze_javascript_application\",\"issues\":[{\"path\":[\"input_path\"],\"reason\":\"invalid_value\",\"message\":\"No file or directory exists at the selected input path (ENOENT): adws/adw_data/rea_synthetic/intentionally-missing.asar\"}]}}\n"
+}

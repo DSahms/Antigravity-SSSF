@@ -455,6 +455,17 @@ const fmtTime = (iso: string | null) => {
       </div>
     </div>
 
+    <div v-if="session?.rawInput" class="section-card" style="margin-top: 14px;">
+      <div class="section-label">Continue the conversation</div>
+      <div aria-live="polite" class="interview-history">
+        <p v-for="message in session.chatHistory" :key="message.id"><strong>{{ message.role === 'user' ? 'You' : 'Crew' }}:</strong> {{ message.content }}</p>
+      </div>
+      <label for="interview-followup">Add a correction, answer, or requirement</label>
+      <textarea id="interview-followup" v-model="chatInput" rows="3" :disabled="analyzing"></textarea>
+      <button class="btn btn-primary" :disabled="analyzing || !chatInput.trim()" @click="doChatSend">{{ analyzing ? 'Thinking…' : 'Send follow-up' }}</button>
+      <button class="btn btn-secondary" :disabled="analyzing" @click="chatInput = 'Re-check the edited specification. Preserve my edits, identify any remaining required questions, and summarize it for review when ready.'; doChatSend()">Re-check edited spec</button>
+    </div>
+
     <!-- Editable spec -->
     <div v-if="session?.rawInput" class="section-card" style="margin-top: 14px;">
       <div class="section-label" style="display: flex; align-items: center; justify-content: space-between;">

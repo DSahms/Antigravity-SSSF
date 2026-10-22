@@ -11,8 +11,8 @@
  * `assertApproved()` before spawning the workflow. This is the rule the
  * mission prompt states must be enforced server-side, not just in the UI.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import type {
   ApprovalBookSummary,
@@ -63,8 +63,18 @@ export class ApprovalBook {
   private executionHash(): string {
     const target = dirname(this.dir);
     const hash = createHash("sha256");
-    for (const relative of ["adws/adw_sssf_config/sssf.config.yaml", ".sssf/profiles.json"]) {
-      const path = join(target, relative);
+    const inputs = ["adws/adw_sssf_config/sssf.config.yaml", ".sssf/profiles.json", ".crew-quality.json"];
+    for (const dir of ["adws", "adws/adw_modules", "adws/adw_data/prompt_engineering"]) {
+      const full = join(target, dir);
+      if (!existsSync(full)) continue;
+      for (const file of readdirSync(full, { recursive: true, withFileTypes: true })) {
+        if (!file.isFile() || !/\.(py|md)$/.test(file.name)) continue;
+        if (file.parentPath.includes("sessions") || file.parentPath.includes("__pycache__")) continue;
+        inputs.push(join(file.parentPath, file.name));
+      }
+    }
+    for (const relative of inputs.sort()) {
+      const path = resolve(target, relative);
       hash.update(relative);
       hash.update(existsSync(path) ? readFileSync(path) : "missing");
     }
