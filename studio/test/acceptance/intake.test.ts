@@ -59,4 +59,38 @@ run("acceptance B — project intake", () => {
     // Forgive only the explicitly-retryable model hiccup the UI names.
     expect(benignDialogs(l.collected.dialogs)).toEqual([]);
   });
+
+  it("Paste button drops real clipboard text (David's exact path)", async () => {
+    await goScreen(l.page, /new job/i);
+    await dismissTour(l.page);
+    await l.page.getByRole("tab", { name: /paste/i }).first().click();
+    const marker = `clipboard-probe-${Date.now().toString(36)} Mini To-Do via button.`;
+    await l.page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await l.page.evaluate((t) => navigator.clipboard.writeText(t), marker);
+    await l.page.getByRole("button", { name: /paste from clipboard/i }).first().click();
+    await l.page.waitForFunction(
+      (m) => (document.querySelectorAll("textarea")[0] as HTMLTextAreaElement)?.value.includes(m),
+      marker,
+      { timeout: 30_000 },
+    );
+    const value = await l.page.locator("textarea").first().inputValue();
+    expect(value).toContain(marker);
+    await screenshot(l.page, "b-paste-button");
+  }, 120_000);
+
+  it("file upload reads a .md file (David's import path)", async () => {
+    const { writeFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const fixture = join(tmpdir(), `crew-acc-upload-${Date.now().toString(36)}.md`);
+    writeFileSync(fixture, "# Uploaded brief\n\nMini To-Do via file upload.", "utf-8");
+    await goScreen(l.page, /new job/i);
+    await dismissTour(l.page);
+    await l.page.getByRole("tab", { name: /upload/i }).first().click();
+    await l.page.locator('input[type="file"]').first().setInputFiles(fixture);
+    await l.page.getByText(/chars/i).first().waitFor({ timeout: 30_000 });
+    const text = await l.page.evaluate(() => document.body.innerText);
+    expect(text).toMatch(/crew-acc-upload-.*\.md/);
+    await screenshot(l.page, "b-upload");
+  }, 120_000);
 });

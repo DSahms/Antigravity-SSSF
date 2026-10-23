@@ -316,6 +316,15 @@ export async function fetchHealth(): Promise<HealthResponse> {
 
 export const getHealth = fetchHealth;
 
+export interface AppVersion {
+  name: string;
+  version: string;
+}
+
+export async function getVersion(): Promise<AppVersion> {
+  return req<AppVersion>("/api/version");
+}
+
 export type { PromptsResponse };
 
 export async function fetchPrompts(adwId: string, agent: string): Promise<PromptsResponse> {

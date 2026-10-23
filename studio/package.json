@@ -1,6 +1,6 @@
 {
   "name": "crew-platform",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "electron-main.cjs",
   "private": true,
   "type": "module",

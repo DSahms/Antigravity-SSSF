@@ -18,7 +18,7 @@ import {
   analyzeWithRetry,
   api,
   waitForRun,
-  PACKED_RESOURCES,
+  appResourcesDir,
   MINI_TODO_TEXT,
   type Launched,
 } from "./helpers";
@@ -81,7 +81,7 @@ run("acceptance C2 — Mini To-Do generated via the UI", () => {
   }, 2_700_000);
 
   it("the generated app exists and behaves as specified", async () => {
-    const dir = join(PACKED_RESOURCES, ".sssf", "projects", PROJECT);
+    const dir = join(appResourcesDir(), ".sssf", "projects", PROJECT);
     const candidates = ["index.html", "todo.html", "app.html", "mini-todo.html"];
     let found = "";
     for (const c of candidates) {

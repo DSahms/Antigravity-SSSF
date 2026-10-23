@@ -22,9 +22,15 @@ import { fileURLToPath } from "node:url";
 
 export const STUDIO_ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 export const REPO_ROOT = resolve(STUDIO_ROOT, "..");
-export const PACKED_ROOT = join(REPO_ROOT, "release", "win-unpacked");
-export const PACKED_EXE = join(PACKED_ROOT, "CREW Software.exe");
-export const PACKED_RESOURCES = join(PACKED_ROOT, "resources");
+/** The packaged app under test: win-unpacked build output by default, or any
+ * installed copy via CREW_ACC_EXE (assignment: test the exact installer after
+ * installation). Layout is identical: exe next to resources/. */
+export function appExePath(): string {
+  return process.env.CREW_ACC_EXE || join(REPO_ROOT, "release", "win-unpacked", "CREW Software.exe");
+}
+export function appResourcesDir(): string {
+  return join(dirname(appExePath()), "resources");
+}
 export const RESULTS_DIR = join(STUDIO_ROOT, "test-results", "acceptance");
 
 export const ROUTER_URL = "http://127.0.0.1:31415";
@@ -97,7 +103,7 @@ export function modelReady(): boolean {
 export function seedProfiles(): boolean {
   const src = join(REPO_ROOT, ".sssf", "profiles.json");
   if (!existsSync(src)) return false;
-  const dir = join(PACKED_RESOURCES, ".sssf");
+  const dir = join(appResourcesDir(), ".sssf");
   try {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     const dest = join(dir, "profiles.json");
@@ -135,9 +141,10 @@ export function portInUse(port: number): boolean {
 }
 
 export async function launchPackaged(port: number): Promise<Launched> {
-  if (!existsSync(PACKED_EXE)) {
+  const exe = appExePath();
+  if (!existsSync(exe)) {
     throw new Error(
-      `Packaged app missing at ${PACKED_EXE}. Build it first: cd studio && bun run electron:dist`,
+      `Packaged app missing at ${exe}. Build it first: cd studio && bun run electron:dist`,
     );
   }
   if (portInUse(port)) {
@@ -170,7 +177,7 @@ export async function launchPackaged(port: number): Promise<Launched> {
   let proc: ChildProcess | null = null;
   let browser: Browser | null = null;
   try {
-    proc = spawn(PACKED_EXE, [`--user-data-dir=${userDataDir}`, `--remote-debugging-port=${dbgPort}`], {
+    proc = spawn(exe, [`--user-data-dir=${userDataDir}`, `--remote-debugging-port=${dbgPort}`], {
       env: { ...process.env, STUDIO_PORT: String(port) },
       stdio: ["ignore", "ignore", "pipe"],
       windowsHide: true,
@@ -447,8 +454,9 @@ export function reapPortOwner(port: number): number | null {
 /** Restart a packaged backend headlessly (same bits the app spawned). The
  * caller owns the returned process and must kill it during teardown. */
 export function startBackendHeadless(port: number): ChildProcess {
-  const bun = join(PACKED_RESOURCES, "bun.exe");
-  const server = join(PACKED_RESOURCES, "app", "server", "index.ts");
+  const resDir = appResourcesDir();
+  const bun = join(resDir, "bun.exe");
+  const server = join(resDir, "app", "server", "index.ts");
   const proc = spawn(bun, ["run", server], {
     env: { ...process.env, STUDIO_PORT: String(port) },
     stdio: "ignore",

@@ -5,7 +5,9 @@ import {
 } from "lucide-vue-next";
 import ScreenHeader from "@/components/ScreenHeader.vue";
 import { startTour, hasFinishedTour, hasFinishedFirstRun } from "@/lib/tour";
+import { getVersion } from "@/lib/api";
 import { go } from "@/lib/nav";
+import { onMounted, ref } from "vue";
 
 const GLOSSARY: { term: string; def: string }[] = [
   { term: "Job", def: "A piece of work you want done. It starts as a description and ends as a result. CREW never runs a job without your approval." },
@@ -26,6 +28,16 @@ const PHONE_TIPS: string[] = [
   "Stopped working on something? Drafts auto-save. Look on the Home screen for 'Resume where you left off'.",
   "Want to undo an approval? You can withdraw it before the run starts. Any spec edit creates a new version that needs re-approval.",
 ];
+
+const appVersion = ref("");
+onMounted(async () => {
+  try {
+    const v = await getVersion();
+    appVersion.value = `${v.name} ${v.version}`;
+  } catch {
+    appVersion.value = "";
+  }
+});
 </script>
 
 <template>
@@ -34,6 +46,9 @@ const PHONE_TIPS: string[] = [
     <div class="section-card">
       <a class="btn btn-secondary" href="/manuals/users-manual/index.html" target="_blank" rel="noopener">User's Manual</a>
       <a class="btn btn-secondary" href="/manuals/learners-manual/index.html" target="_blank" rel="noopener">Learner's Manual</a>
+      <p v-if="appVersion" class="dim" style="font-size: 12.5px; margin-top: 10px;">
+        Installed build: <strong>{{ appVersion }}</strong> — quote this when reporting a problem.
+      </p>
     </div>
 
     <div class="help-cols">

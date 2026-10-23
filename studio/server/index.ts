@@ -486,7 +486,14 @@ const server = Bun.serve({
     // ── STUDIO VERSION ENDPOINT ──────────────────────────────────────────
 
     "/api/version": safely(() => {
-      return json({ name: 'C.R.E.W. Software', version: '1.0.0' });
+      // The shipped app package (resources/app/package.json, or studio/
+      // package.json in dev) is the single source of the build version.
+      let version = "1.0.0";
+      try {
+        const pkg = JSON.parse(readFileSync(join(DIST_DIR, "..", "package.json"), "utf-8"));
+        if (typeof pkg.version === "string" && pkg.version) version = pkg.version;
+      } catch {}
+      return json({ name: 'C.R.E.W. Software', version });
     }),
 
     "/api/sessions": safely((req) => {
