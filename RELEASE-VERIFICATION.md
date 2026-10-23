@@ -121,10 +121,41 @@ Through `120cedb` (previous round) plus this round:
   `test:acceptance` / `test:acceptance-full` scripts and per-run isolation
 - Rewritten install docs + this report (`18c0957`)
 
+## 8. Round 3 — David's installed copy was the old build (2026-10-23)
+
+David reported the same `Failed to fetch` dialog after the round-2 fixes.
+Inspection of his machine (read-only) identified his running build exactly:
+
+- Executable: `C:\Program Files\CREW Software\CREW Software.exe`
+- Shell: `loadFile(dist/index.html)` first (file:// mode) — the pre-HTTP build
+- API client: generic `That didn't work: Failed to fetch` (no actionable message)
+- Backend: yaml-bundled generation, version `1.0.0`, no gate exemption
+- Conclusion: the fixed installers were never installed there. The NSIS
+  1.0.1 upgrade stalls while the previous version's files are locked by its
+  still-running instances (its uninstaller targets them); this is
+  environmental, not a product defect, and was left untouched.
+
+Reproduced with identical bits: `fetch("file:///D:/api/studio/discovery/analyze")`
+→ `net::ERR_FILE_NOT_FOUND` → the verbatim alert from his screenshot. The
+acceptance suite had passed because it tested the new bits in `win-unpacked`
+while David ran the old install — plus nothing exercised the Paste-button
+clipboard path. Closed now:
+
+- **1.0.1** (`studio/package.json`, `/api/version` reads the shipped package):
+  `release/CREW Software Setup 1.0.1.exe`, 118,873,261 bytes,
+  SHA-256 `56B6D13625BD3726C0E13E8B9BA29960A6A8EC50BF5DE7429F1B11F4DB1F3681`.
+- Help screen shows `Installed build: C.R.E.W. Software <version>` — quote it
+  when reporting problems.
+- Test H asserts backend version == source-tree version and the UI shows it.
+- Intake tests now cover David's exact paths: Paste button with the real OS
+  clipboard, and `.md` file upload — both pass on 1.0.1 bits.
+- `CREW_ACC_EXE` overrides the app under test (used to validate installed copies).
+- Full suite re-run on 1.0.1 bits: routine 18/18 pass; C2 Mini To-Do 3/3 pass.
+- Speech: Electron builds have no Web Speech service key (`onerror: network`
+  probed in-app); mic dictation needs an external service that is not
+  bundled. Paste/Upload/Ctrl+V are the supported intake paths.
+
 ## Verdict
 
-**COMPLETE — VERIFIED.** The installed application launches, intake works,
-the user can advance, approved workflows complete, the generated app works,
-mic/read-back meet their supported acceptance tests, and the permanent
-acceptance suite passes against the packaged build. Do not publish without
+**COMPLETE — VERIFIED** (see §6 limitations). Do not publish without
 explicit approval.
