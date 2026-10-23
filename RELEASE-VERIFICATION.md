@@ -113,9 +113,13 @@ renders, New Job analyze works) is still recommended before closing this out.
 
 ## 7. Commits (branch `codex/rea-recovery`)
 
-Through `120cedb` (previous round) plus this round: HTTP-first shell +
-permissions, actionable API/mic errors, clean-tree exemption, the
-`studio/test/acceptance` suite + docs, and this report.
+Through `120cedb` (previous round) plus this round:
+- HTTP-first Electron shell + media/clipboard permission grants
+- Actionable backend-unreachable errors (api.ts) and honest mic errors (NewJobView)
+- Clean-tree gate exempts product-managed `.crew-quality.json` + approved-spec copies
+- Permanent `studio/test/acceptance/` suite (A–G + Mini To-Do release run) with
+  `test:acceptance` / `test:acceptance-full` scripts and per-run isolation
+- Rewritten install docs + this report (`18c0957`)
 
 ## Verdict
 
