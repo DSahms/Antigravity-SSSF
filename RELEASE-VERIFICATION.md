@@ -151,9 +151,38 @@ clipboard path. Closed now:
   clipboard, and `.md` file upload — both pass on 1.0.1 bits.
 - `CREW_ACC_EXE` overrides the app under test (used to validate installed copies).
 - Full suite re-run on 1.0.1 bits: routine 18/18 pass; C2 Mini To-Do 3/3 pass.
+- Run `test:acceptance/voicetyping.test.ts` for the Windows Voice Typing
+  compatibility proof (Test I): every intake control is a native focusable
+  field with a caret, accepts IME-committed text exactly as voice typing
+  delivers it, and stays editable — verified with the first-run tour showing.
 - Speech: Electron builds have no Web Speech service key (`onerror: network`
   probed in-app); mic dictation needs an external service that is not
   bundled. Paste/Upload/Ctrl+V are the supported intake paths.
+
+## 9. Round 4 — Windows Voice Typing compatibility (2026-10-23)
+
+David uses the OS Voice Typing launcher (Win+H), not the in-app mic button
+(which needs an external speech service — still honestly reported, unchanged).
+No new speech system was built. Verified instead that every text entry is a
+standard control the OS launcher can drive:
+
+- All intake controls are native `<textarea>`/`<input>` (code inspection +
+  runtime tag/focus/caret assertions). No overlay, dim layer, disabled shim,
+  or focus handler intercepts clicks — asserted per control with
+  `elementFromPoint` while the first-run tour is showing.
+- `keyboard.insertText` (IME-style commit with no key events — exactly how
+  voice typing delivers text) lands in each field and stays editable
+  (append, select-all, replace all verified).
+- Covered: talk + paste textareas, question free-text, chat composer, spec
+  editor. Normal typing, Ctrl+V, Paste button, file upload, and dictation
+  insertion tested as separate paths (`intake.test.ts`, `voicetyping.test.ts`).
+- Finding on David's "could not click" report: nothing blocks clicking — on
+  his old build the Paste *button* failed (clipboard permission under
+  `file://`) while Ctrl+V worked, and Continue stayed disabled (backend
+  unreachable). All three are fixed and covered.
+- Remaining step (human): press Win+H in any field and dictate once. The app
+  side of that contract is proven; only a live voice pass remains, which no
+  automated test can perform.
 
 ## Verdict
 
