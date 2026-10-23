@@ -11,7 +11,7 @@
 ## Install
 
 1. Run `release/CREW Software Setup 1.0.0.exe` from this repository
-   (SHA-256 `F803BAB99BF55F3AECC38757A09F5CB2AD7A44449C87A06031C1038A610CE390`).
+   (SHA-256 `653AE3C538CC09A8150A0F625AE72CC47ADD92F14C0D03C7B426924A4F3A70FD`).
 2. Take the default location (per-user, no elevation), or pick another folder.
 3. Launch **CREW Software** from the Start Menu shortcut.
 
@@ -55,6 +55,25 @@ bun run electron:dist    # -> ../release/CREW Software Setup 1.0.0.exe
 
 Before rebuilding, stop any server running from `release/win-unpacked`
 (or delete that directory) — the packager must be able to replace it.
+
+## Permanent acceptance tests (release gate)
+
+The suite in `studio/test/acceptance/` drives the real packaged app
+(`release/win-unpacked`), not the dev server:
+
+```
+cd studio
+bun run test:acceptance       # A–G except the real agent build (needs router)
+bun run test:acceptance-full  # everything, including Mini To-Do via the UI
+```
+
+- Uses isolated ports 4631–4638 plus a private Chromium profile per run, so a
+  live install on 4620 is never touched.
+- Model-backed tests (intake interview, agent builds) need the local router
+  at `127.0.0.1:31415` and skip with a clear reason without it.
+- Results: console JSON report + `studio/test-results/acceptance/` (per-test
+  logs, failure screenshots). The gate fails if any mandatory user workflow
+  fails. Never let mocked backends substitute for the real packaged backend.
 
 ## Troubleshooting
 

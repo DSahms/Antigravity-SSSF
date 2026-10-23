@@ -34,13 +34,26 @@ import type {
 import type { EventRow, PromptsResponse } from "./types.ts";
 
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers || {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options?.headers || {}),
+      },
+    });
+  } catch (e: any) {
+    // Network-level failure (DNS/refused/file:// origin). The raw
+    // "Failed to fetch" tells the user nothing — say what to do.
+    const where = `${window.location.origin}${path}`;
+    throw new Error(
+      `Cannot reach the CREW backend (tried ${where}). ` +
+      `The backend may still be starting — wait a few seconds and retry. ` +
+      `If this persists, restart the app so it can start its backend. ` +
+      `(${e?.message ?? e})`,
+    );
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));

@@ -292,7 +292,20 @@ export class WorkflowLauncher {
     }
     const gitStatus = Bun.spawnSync(["git", "status", "--porcelain"], { cwd: this.targetDir });
     if (gitStatus.exitCode !== 0) throw new Error("Choose a prepared app project with Git history.");
-    if (!["adw_scout.py", "adw_quality.py", "adw_rea_plan.py", "adw_verify_sdlc.py"].includes(req.workflowId) && gitStatus.stdout.toString().trim()) throw new Error("This project has uncommitted work. Review and save it before starting agents, or create a separate app project.");
+    // Product-managed files are not user work: the checks file written by
+    // Settings → Project checks and the runtime approval copies this launcher
+    // materializes must never block a launch (or no project with saved checks
+    // could ever start an agent workflow).
+    const dirty = gitStatus.stdout.toString().split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const path = line.slice(2).trim().replace(/^"(.*)"$/, "$1");
+        const arrow = path.indexOf(" -> ");
+        return arrow >= 0 ? path.slice(arrow + 4) : path;
+      })
+      .filter((f) => f !== ".crew-quality.json" && !f.startsWith(".sssf/approved-specs/"));
+    if (!["adw_scout.py", "adw_quality.py", "adw_rea_plan.py", "adw_verify_sdlc.py"].includes(req.workflowId) && dirty.length) throw new Error("This project has uncommitted work. Review and save it before starting agents, or create a separate app project.");
     // ───────────────────────────────────────────────────────────────────
 
     const scriptPath = join("adws", req.workflowId);

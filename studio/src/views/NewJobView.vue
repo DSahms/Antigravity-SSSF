@@ -36,7 +36,20 @@ function toggleVoice() {
     saveDraft();
   };
   voice.onend = () => { listening.value = false; };
-  voice.onerror = () => { listening.value = false; alert("Voice input couldn't start. Check microphone permission, or use Paste or Upload."); };
+  voice.onerror = (event: any) => {
+    listening.value = false;
+    const code = event?.error ?? "unknown";
+    // Chromium's Web Speech API needs an external speech service. Electron
+    // builds have no service key, so recognition fails with "network" even
+    // with a working microphone. Say exactly that instead of blaming the mic.
+    if (code === "network" || code === "service-not-allowed") {
+      alert("Voice recognition needs an external speech service, which isn't available in the desktop app (error: " + code + "). Paste or Upload your text instead — it goes through the same interview.");
+    } else if (code === "not-allowed" || code === "permission-denied") {
+      alert("Microphone access was blocked. Allow microphone use for this app, then try again — or Paste/Upload your text.");
+    } else {
+      alert("Voice input couldn't start (" + code + "). Use Paste or Upload instead.");
+    }
+  };
   listening.value = true;
   voice.start();
 }

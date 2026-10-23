@@ -169,6 +169,9 @@ sssf.db*
 # local telemetry / generated ids — never commit
 .freebuff/
 
+# acceptance run artifacts (screenshots, logs, reports) — regenerated on demand
+/studio/test-results/
+
 # demo app runtime (example branch)
 apps/inkwell/inkwell.db*
 

@@ -13,6 +13,8 @@
     "test": "bun test test/core.bun.test.ts",
     "test:tour": "node node_modules/vitest/vitest.mjs run test/tour-overlap.test.ts",
     "test:approval": "node node_modules/vitest/vitest.mjs run test/approval-enforcement.test.ts",
+    "test:acceptance": "CREW_ACCEPTANCE=1 node node_modules/vitest/vitest.mjs run test/acceptance --no-file-parallelism --hookTimeout=180000 --testTimeout=600000 --reporter=default --reporter=json --outputFile=test-results/acceptance.json",
+    "test:acceptance-full": "CREW_ACCEPTANCE=1 CREW_ACCEPTANCE_FULL=1 node node_modules/vitest/vitest.mjs run test/acceptance --no-file-parallelism --hookTimeout=180000 --testTimeout=600000 --reporter=default --reporter=json --outputFile=test-results/acceptance.json",
     "postinstall": "vite build",
     "electron": "electron .",
     "electron:build": "electron-builder",
